@@ -13,6 +13,9 @@ importers:
 
   .:
     dependencies:
+      '@ag-ui/core':
+        specifier: ^0.0.57
+        version: 0.0.57
       '@ag-ui/mastra':
         specifier: ^1.1.1
         version: 1.1.1(867f1a8d2afe6b85085fd284f0070535)
