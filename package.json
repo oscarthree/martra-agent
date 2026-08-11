@@ -1,0 +1,54 @@
+{
+  "name": "express-ts-boilerplate",
+  "version": "1.0.0",
+  "description": "An Express.js + TypeScript boilerplate",
+  "main": "dist/index.js",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "client:dev": "vite --host 0.0.0.0",
+    "client:build": "vite build",
+    "test": "vitest run"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mastra-ai/express-ts-boilerplate.git"
+  },
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/mastra-ai/express-ts-boilerplate/issues"
+  },
+  "homepage": "https://github.com/mastra-ai/express-ts-boilerplate#readme",
+  "dependencies": {
+    "@ag-ui/mastra": "^1.1.1",
+    "@ai-sdk/openai": "^3.0.36",
+    "@ai-sdk/openai-compatible": "^3.0.11",
+    "@copilotkit/react-core": "^1.66.4",
+    "@copilotkit/react-ui": "^1.66.4",
+    "@copilotkit/runtime": "^1.66.4",
+    "@mastra/core": "^1.51.0",
+    "@mastra/duckdb": "^1.5.1",
+    "@mastra/express": "^1.4.7",
+    "@mastra/libsql": "^1.16.0",
+    "@mastra/loggers": "^1.2.0",
+    "@mastra/memory": "^1.23.0",
+    "@mastra/observability": "^1.16.1",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "mastra": "^1.19.0",
+    "openai": "^7.4.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.0.2",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "@vitejs/plugin-react": "^6.0.5",
+    "tsx": "4.21.0",
+    "typescript": "^5.9.3",
+    "vite": "^8.2.1",
+    "vitest": "^4.1.10"
+  }
+}

@@ -1,0 +1,41 @@
+@import url("https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap");
+
+:root {
+  color: #e9edf2;
+  background: #101417;
+  font-family: "Space Grotesk", sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; min-height: 100vh; }
+
+.app-shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(280px, 0.9fr) minmax(420px, 1.1fr);
+  gap: 7vw;
+  align-items: center;
+  padding: 7vw 10vw;
+  background: radial-gradient(circle at 8% 12%, #233b40 0, transparent 30%), #101417;
+}
+
+.intro-panel { max-width: 560px; }
+.eyebrow, .status-line { font: 500 11px "DM Mono", monospace; letter-spacing: 0.08em; text-transform: uppercase; }
+.eyebrow { color: #7cc8b6; margin: 0 0 32px; }
+h1 { max-width: 520px; margin: 0; color: #f3f0e8; font-size: clamp(42px, 5.5vw, 78px); line-height: 0.98; letter-spacing: -0.03em; }
+.lede { max-width: 390px; margin: 32px 0 48px; color: #9da9ad; font-size: 18px; line-height: 1.55; }
+.prompt-grid { display: grid; gap: 10px; max-width: 390px; color: #c9d2d2; font-size: 14px; }
+.prompt-grid span { border-left: 2px solid #e7b86b; padding: 10px 14px; background: #182024; }
+.status-line { display: flex; align-items: center; gap: 9px; margin-top: 56px; color: #7d8d91; }
+.status-line span { width: 7px; height: 7px; border-radius: 50%; background: #7cc8b6; box-shadow: 0 0 0 4px #24443f; }
+.chat-panel { min-height: 620px; height: min(78vh, 760px); overflow: hidden; border: 1px solid #334147; border-radius: 4px; background: #171d20; box-shadow: 18px 24px 0 #0b0e10; }
+.chat-panel > * { height: 100%; }
+
+@media (max-width: 800px) {
+  .app-shell { grid-template-columns: 1fr; gap: 40px; padding: 48px 22px; }
+  .lede { margin: 24px 0 30px; }
+  .status-line { margin-top: 30px; }
+  .chat-panel { min-height: 600px; height: 70vh; }
+}
