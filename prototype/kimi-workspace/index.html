@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Weather Copilot - Kimi Workspace Prototype</title>
+  <style>
+    :root {
+      --ink: #202124;
+      --muted: #787b83;
+      --line: #e9e9ec;
+      --paper: #ffffff;
+      --soft: #f7f7f8;
+      --canvas: #f2f3f5;
+      --accent: #5667f2;
+      --accent-soft: #eef0ff;
+      --warm: #f6efe8;
+      --shadow: 0 20px 60px rgba(38, 40, 55, .10);
+      font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    body { margin: 0; color: var(--ink); background: var(--canvas); min-height: 100vh; }
+    button, input { font: inherit; }
+    button { border: 0; cursor: pointer; color: inherit; }
+    .prototype-note { position: fixed; top: 14px; right: 16px; z-index: 20; color: #747681; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
+    .workspace { min-height: 100vh; display: grid; }
+    .sidebar { background: var(--paper); border-right: 1px solid var(--line); display: flex; flex-direction: column; padding: 20px 14px; min-width: 0; }
+    .brand { display: flex; gap: 10px; align-items: center; padding: 2px 9px 25px; font-size: 16px; font-weight: 720; letter-spacing: -.03em; }
+    .brand-mark { width: 27px; height: 27px; display: grid; place-items: center; border-radius: 9px; background: var(--ink); color: white; font-size: 13px; }
+    .new-chat { display: flex; align-items: center; gap: 10px; padding: 11px 12px; border-radius: 11px; background: var(--ink); color: white; font-weight: 650; font-size: 13px; margin-bottom: 18px; }
+    .new-chat:hover { background: #34363a; }
+    .nav-title { color: #a1a3aa; font-size: 10px; letter-spacing: .11em; text-transform: uppercase; padding: 0 10px 7px; }
+    .nav-item, .project-item, .history-item { width: 100%; display: flex; align-items: center; gap: 9px; text-align: left; padding: 9px 10px; background: transparent; border-radius: 9px; font-size: 13px; }
+    .nav-item:hover, .project-item:hover, .history-item:hover { background: var(--soft); }
+    .nav-item.active, .project-item.active, .history-item.active { background: var(--accent-soft); color: #4454d6; }
+    .nav-icon { width: 17px; color: #858791; text-align: center; }
+    .side-section { margin-top: 20px; }
+    .project-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); flex: none; }
+    .project-dot.sun { background: #e8a349; }
+    .history-list { display: grid; gap: 2px; }
+    .history-item { color: #555860; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+    .history-date { color: #a7a8af; font-size: 10px; padding: 12px 10px 5px; }
+    .profile { margin-top: auto; border-top: 1px solid var(--line); padding: 15px 9px 0; display: flex; align-items: center; gap: 9px; font-size: 12px; }
+    .avatar { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: var(--warm); color: #9b7558; font-weight: 700; }
+    .main { min-width: 0; display: flex; flex-direction: column; background: var(--paper); }
+    .topbar { height: 66px; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; padding: 0 30px; gap: 15px; }
+    .mobile-menu { display: none; background: transparent; font-size: 21px; }
+    .context-picker { display: inline-flex; align-items: center; gap: 8px; padding: 8px 11px; border-radius: 10px; background: var(--soft); font-size: 13px; font-weight: 650; }
+    .context-picker span { color: #a2a3aa; font-size: 11px; }
+    .top-actions { display: flex; align-items: center; gap: 7px; }
+    .icon-button { width: 32px; height: 32px; border-radius: 9px; background: transparent; color: #777a83; font-size: 17px; }
+    .icon-button:hover { background: var(--soft); color: var(--ink); }
+    .chat { width: min(780px, calc(100% - 42px)); flex: 1; margin: 0 auto; display: flex; flex-direction: column; padding: 54px 0 24px; }
+    .welcome { margin: auto 0; padding-bottom: 70px; }
+    .welcome-kicker { color: var(--accent); font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+    h1 { font-size: clamp(30px, 4vw, 48px); letter-spacing: -.055em; line-height: 1.04; max-width: 600px; margin: 13px 0 15px; }
+    .welcome-copy { color: var(--muted); max-width: 480px; line-height: 1.65; margin: 0; font-size: 14px; }
+    .suggestions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 27px; }
+    .suggestion { padding: 9px 12px; border: 1px solid var(--line); border-radius: 9px; color: #666972; background: white; font-size: 12px; }
+    .suggestion:hover { border-color: #cfd2ff; background: var(--accent-soft); }
+    .composer { border: 1px solid #dfe0e5; border-radius: 16px; box-shadow: 0 5px 20px rgba(37, 38, 49, .05); padding: 13px 14px 10px; background: white; }
+    .composer textarea { width: 100%; min-height: 44px; resize: none; border: 0; outline: 0; color: var(--ink); background: transparent; font-size: 14px; }
+    .composer-footer { display: flex; justify-content: space-between; align-items: center; color: #a0a1a8; font-size: 11px; }
+    .composer-tools { display: flex; gap: 5px; }
+    .send { width: 30px; height: 30px; border-radius: 9px; background: var(--accent); color: white; font-size: 15px; }
+    .composer-hint { color: #a4a5ac; font-size: 10px; margin: 9px 3px 0; }
+    .variant-a { grid-template-columns: 244px minmax(0, 1fr); }
+
+    .variant-b { grid-template-columns: 70px minmax(0, 1fr); }
+    .variant-b .sidebar { padding: 19px 11px; align-items: center; }
+    .variant-b .brand { padding: 2px 0 34px; }
+    .variant-b .brand span:last-child, .variant-b .new-chat span, .variant-b .nav-item span:last-child, .variant-b .side-section, .variant-b .profile span { display: none; }
+    .variant-b .new-chat { width: 42px; height: 42px; justify-content: center; padding: 0; border-radius: 13px; margin-bottom: 22px; font-size: 19px; }
+    .variant-b .nav-item { width: 42px; height: 42px; justify-content: center; padding: 0; font-size: 18px; }
+    .variant-b .nav-icon { width: auto; }
+    .variant-b .profile { padding: 15px 0 0; }
+    .variant-b .topbar { padding: 0 38px; }
+    .variant-b .chat { width: min(900px, calc(100% - 58px)); }
+    .variant-b .welcome { text-align: center; }
+    .variant-b h1 { margin-left: auto; margin-right: auto; }
+    .variant-b .welcome-copy { margin: auto; }
+    .variant-b .suggestions { justify-content: center; }
+
+    .variant-c { grid-template-columns: 330px minmax(0, 1fr); }
+    .variant-c .sidebar { background: #fbfbfc; padding: 23px 20px; }
+    .variant-c .brand { padding-left: 0; }
+    .variant-c .new-chat { justify-content: center; background: white; border: 1px solid var(--line); color: var(--ink); }
+    .variant-c .side-section { margin-top: 8px; }
+    .variant-c .nav-title { padding-left: 0; }
+    .variant-c .nav-item { padding-left: 0; }
+    .variant-c .project-item { background: white; border: 1px solid var(--line); margin-bottom: 7px; padding: 13px 12px; }
+    .variant-c .project-item.active { border-color: #cfd2ff; }
+    .variant-c .history-list { border-top: 1px solid var(--line); padding-top: 8px; margin-top: 19px; }
+    .variant-c .topbar { height: 76px; padding: 0 38px; }
+    .variant-c .context-picker { background: white; border: 1px solid var(--line); }
+    .variant-c .welcome { margin-top: 90px; }
+    .variant-c .chat { padding-top: 25px; }
+
+    .prototype-switcher { position: fixed; z-index: 50; left: 50%; bottom: 17px; transform: translateX(-50%); display: flex; align-items: center; gap: 12px; padding: 8px 11px; background: #22242a; color: white; border-radius: 14px; box-shadow: 0 12px 30px rgba(0,0,0,.22); font-size: 11px; }
+    .prototype-switcher button { width: 27px; height: 27px; border-radius: 8px; background: #3a3d45; color: white; }
+    .prototype-switcher button:hover { background: var(--accent); }
+    .variant-name { min-width: 132px; text-align: center; }
+    .modal-backdrop { position: fixed; inset: 0; background: rgba(30, 31, 38, .25); z-index: 40; display: grid; place-items: center; }
+    .modal { width: min(390px, calc(100% - 34px)); background: white; border-radius: 18px; box-shadow: var(--shadow); padding: 25px; }
+    .modal h2 { margin: 0 0 6px; font-size: 20px; letter-spacing: -.04em; }
+    .modal p { color: var(--muted); font-size: 13px; margin: 0 0 18px; }
+    .modal input { width: 100%; padding: 12px; border: 1px solid #dfe0e5; border-radius: 10px; outline-color: var(--accent); }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+    .modal-actions button { padding: 9px 13px; border-radius: 9px; background: var(--soft); font-size: 12px; }
+    .modal-actions .primary { background: var(--accent); color: white; }
+    .drawer { position: fixed; inset: 0; z-index: 30; background: rgba(25, 26, 31, .25); display: none; }
+    .drawer .sidebar { width: 260px; height: 100%; box-shadow: var(--shadow); }
+    .is-hidden { display: none !important; }
+
+    @media (max-width: 720px) {
+      .prototype-note { display: none; }
+      .workspace, .variant-a, .variant-b, .variant-c { grid-template-columns: 1fr; }
+      .workspace > .sidebar { display: none; }
+      .topbar { height: 60px; padding: 0 17px !important; }
+      .mobile-menu { display: block; }
+      .chat { width: min(100% - 30px, 680px) !important; padding-top: 28px !important; }
+      .welcome { margin-top: 30px !important; padding-bottom: 45px; }
+      h1 { font-size: 36px; }
+      .context-picker { max-width: 170px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+      .variant-b .topbar { justify-content: space-between; }
+      .variant-c .welcome { text-align: left; }
+      .variant-c .suggestions { justify-content: flex-start; }
+      .drawer.open { display: block; }
+    }
+  </style>
+</head>
+<body>
+  <div class="prototype-note">PROTOTYPE / NO PERSISTENCE</div>
+  <div id="app"></div>
+  <div id="modal-root"></div>
+  <div class="prototype-switcher" aria-label="Prototype variants">
+    <button id="previous" aria-label="Previous variant">←</button>
+    <div class="variant-name" id="variant-name"></div>
+    <button id="next" aria-label="Next variant">→</button>
+  </div>
+
+  <script>
+    const variants = [
+      { key: 'A', name: '宽侧栏工作区' },
+      { key: 'B', name: '紧凑图标栏' },
+      { key: 'C', name: '项目优先布局' },
+    ];
+    const state = { projects: ['天气助手', '周末旅行'], activeProject: '天气助手', history: ['北京周末天气', '大连三天行程'], drawer: false };
+    const icon = { plus: '+', chat: '◌', project: '▦', history: '◷', settings: '⚙', menu: '☰', chevron: '⌄', send: '↑', more: '•••' };
+
+    function currentVariant() {
+      const key = new URLSearchParams(location.search).get('variant') || 'A';
+      return variants.find(item => item.key === key) || variants[0];
+    }
+
+    function sideBar() {
+      return `<aside class="sidebar">
+        <div class="brand"><div class="brand-mark">☼</div><span>Weather Copilot</span></div>
+        <button class="new-chat" onclick="newSession()"><span>${icon.plus}</span><span>新建会话</span></button>
+        <div class="nav-title">工作区</div>
+        <button class="nav-item active" onclick="flash('项目')"><span class="nav-icon">${icon.project}</span><span>项目</span></button>
+        <button class="nav-item" onclick="flash('会话历史')"><span class="nav-icon">${icon.history}</span><span>会话历史</span></button>
+        <section class="side-section"><div class="nav-title">我的项目</div>${state.projects.map((project, i) => `<button class="project-item ${project === state.activeProject ? 'active' : ''}" onclick="selectProject('${project}')"><span class="project-dot ${i ? 'sun' : ''}"></span><span>${project}</span></button>`).join('')}</section>
+        <section class="side-section"><div class="nav-title">最近会话</div><div class="history-list"><div class="history-date">今天</div>${state.history.map(title => `<button class="history-item" onclick="selectHistory('${title}')"><span class="nav-icon">${icon.chat}</span><span>${title}</span></button>`).join('')}</div></section>
+        <div class="profile"><div class="avatar">W</div><span>本地工作区</span></div>
+      </aside>`;
+    }
+
+    function topbar() {
+      return `<header class="topbar"><button class="mobile-menu" onclick="toggleDrawer()">${icon.menu}</button><button class="context-picker" onclick="openProjectModal()">${state.activeProject}<span>${icon.chevron}</span></button><div class="top-actions"><button class="icon-button" onclick="openProjectModal()" title="新建项目">${icon.plus}</button><button class="icon-button" onclick="flash('更多设置')">${icon.more}</button></div></header>`;
+    }
+
+    function chat() {
+      return `<section class="chat"><div class="welcome"><div class="welcome-kicker">LIVE WEATHER ASSISTANT</div><h1>今天想去哪里？</h1><p class="welcome-copy">告诉我一个城市、天气问题，或者你的下一段旅程。我会结合实时天气，帮你把一天安排得更从容。</p><div class="suggestions"><button class="suggestion" onclick="fillPrompt('北京周末天气怎么样？')">北京周末天气</button><button class="suggestion" onclick="fillPrompt('帮我安排大连三天行程')">大连三天行程</button><button class="suggestion" onclick="fillPrompt('东京今天适合带什么？')">东京出行建议</button></div></div><div><div class="composer"><textarea id="prompt" placeholder="询问天气、规划行程或选择一个项目..."></textarea><div class="composer-footer"><div class="composer-tools"><button class="icon-button" onclick="flash('添加附件')">⊕</button><button class="icon-button" onclick="openProjectModal()">▦</button></div><button class="send" onclick="submitPrompt()">${icon.send}</button></div></div><div class="composer-hint">Weather Copilot 可根据天气预报安排活动</div></div></section>`;
+    }
+
+    function render() {
+      const variant = currentVariant();
+      document.getElementById('variant-name').textContent = `${variant.key} · ${variant.name}`;
+      document.getElementById('app').innerHTML = `<main class="workspace variant-${variant.key.toLowerCase()}">${sideBar()}<div class="main">${topbar()}${chat()}</div></main><div class="drawer ${state.drawer ? 'open' : ''}" onclick="closeDrawer(event)">${sideBar()}</div>`;
+    }
+
+    function setVariant(index) { const next = variants[(index + variants.length) % variants.length]; history.replaceState(null, '', `?variant=${next.key}`); render(); }
+    function move(direction) { const index = variants.findIndex(item => item.key === currentVariant().key); setVariant(index + direction); }
+    function toggleDrawer() { state.drawer = !state.drawer; render(); }
+    function closeDrawer(event) { if (event.target.classList.contains('drawer')) { state.drawer = false; render(); } }
+    function newSession() { state.history.unshift('新会话'); flash('已创建新会话'); render(); }
+    function selectProject(project) { state.activeProject = project; flash(`已切换到${project}`); render(); }
+    function selectHistory(title) { fillPrompt(`继续讨论：${title}`); flash(`已选择会话：${title}`); }
+    function fillPrompt(text) { const prompt = document.getElementById('prompt'); if (prompt) { prompt.value = text; prompt.focus(); } }
+    function submitPrompt() { const prompt = document.getElementById('prompt'); if (prompt && prompt.value.trim()) { state.history.unshift(prompt.value.trim().slice(0, 24)); flash('原型中已记录消息'); prompt.value = ''; render(); } }
+    function flash(text) { const toast = document.createElement('div'); toast.textContent = text; Object.assign(toast.style, { position: 'fixed', left: '50%', top: '22px', transform: 'translateX(-50%)', zIndex: 80, padding: '9px 13px', background: '#22242a', color: 'white', borderRadius: '9px', fontSize: '12px' }); document.body.appendChild(toast); setTimeout(() => toast.remove(), 1300); }
+    function openProjectModal() { document.getElementById('modal-root').innerHTML = `<div class="modal-backdrop" onclick="closeModal(event)"><div class="modal" onclick="event.stopPropagation()"><h2>新建项目</h2><p>为一组天气咨询和旅行计划创建一个清晰的工作区。</p><input id="project-name" placeholder="例如：秋季旅行" autofocus /><div class="modal-actions"><button onclick="closeModal()">取消</button><button class="primary" onclick="createProject()">创建项目</button></div></div></div>`; }
+    function closeModal(event) { if (!event || event.target.classList.contains('modal-backdrop')) document.getElementById('modal-root').innerHTML = ''; }
+    function createProject() { const input = document.getElementById('project-name'); const name = input && input.value.trim(); if (!name) return; state.projects.push(name); state.activeProject = name; closeModal(); render(); flash(`已创建${name}`); }
+
+    document.getElementById('previous').onclick = () => move(-1);
+    document.getElementById('next').onclick = () => move(1);
+    document.addEventListener('keydown', event => { if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return; if (event.key === 'ArrowLeft') move(-1); if (event.key === 'ArrowRight') move(1); });
+    render();
+  </script>
+</body>
+</html>
