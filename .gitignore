@@ -137,3 +137,10 @@ dist
 # Vite logs files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# Mastra runtime data
+mastra.db
+mastra.db-shm
+mastra.db-wal
+mastra.duckdb
+mastra.duckdb.wal
