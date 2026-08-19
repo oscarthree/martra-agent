@@ -30,6 +30,33 @@ body { margin: 0; min-width: 320px; min-height: 100vh; }
   border-right: 1px solid #2a3439;
   padding-right: 18px;
 }
+.project-selector { display: flex; gap: 6px; align-items: center; }
+.project-selector select {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid #334147;
+  border-radius: 4px;
+  padding: 8px 10px;
+  background: #182024;
+  color: #e9edf2;
+  font: 500 13px "Space Grotesk", sans-serif;
+}
+.project-actions { display: inline-flex; gap: 4px; }
+.project-actions button {
+  border: 1px solid #334147;
+  border-radius: 4px;
+  padding: 7px 8px;
+  background: none;
+  color: #7d8d91;
+  font-size: 12px;
+  cursor: pointer;
+}
+.project-actions button:hover { color: #e9edf2; border-color: #7cc8b6; }
+.active-project-caption {
+  margin: -8px 0 0;
+  color: #7d8d91;
+  font-size: 12px;
+}
 .new-session-button {
   border: 1px solid #334147;
   border-radius: 4px;

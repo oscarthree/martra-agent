@@ -1,18 +1,23 @@
 import { describe, expect, it } from "vitest";
 import {
   createDefaultWorkspace,
+  createProject,
   createSession,
+  deleteProject,
   deleteSession,
   deriveSessionTitle,
+  filterSessionsByScope,
   getSessionHistory,
   groupSessionHistory,
   loadWorkspace,
   parseWorkspace,
   reconcileSessionMessages,
+  renameProject,
   renameSession,
   saveWorkspace,
   serializeWorkspace,
   setSessionMessages,
+  switchProject,
   switchSession,
 } from "./workspace-state";
 
@@ -388,5 +393,198 @@ describe("reconcileSessionMessages", () => {
 
   it("stays in sync when both sides are empty", () => {
     expect(reconcileSessionMessages([], [])).toBe("in-sync");
+  });
+});
+
+describe("createProject", () => {
+  it("creates a project, activates it, and opens an empty session in it", () => {
+    const workspace = createDefaultWorkspace(() => "2026-08-11T00:00:00.000Z", sequentialIds());
+    const previousSessionId = workspace.activeSessionId;
+
+    const next = createProject(workspace, "东京行程", {
+      now: () => "2026-08-12T00:00:00.000Z",
+      createId: sequentialIds("p"),
+    });
+
+    expect(next.projects).toHaveLength(2);
+    const project = next.projects[1]!;
+    expect(project.id).toBe("p-1");
+    expect(project.name).toBe("东京行程");
+    expect(next.activeProjectId).toBe("p-1");
+
+    const session = next.sessions.find((s) => s.id === next.activeSessionId)!;
+    expect(session.id).toBe("p-2");
+    expect(session.projectId).toBe("p-1");
+    expect(session.messages).toEqual([]);
+    expect(next.activeSessionId).not.toBe(previousSessionId);
+  });
+});
+
+describe("switchProject", () => {
+  it("changes only the active project, not session ownership or active session", () => {
+    let workspace = createDefaultWorkspace(() => "2026-08-11T00:00:00.000Z", sequentialIds());
+    workspace = createProject(workspace, "东京行程", {
+      now: () => "2026-08-12T00:00:00.000Z",
+      createId: sequentialIds("p"),
+    });
+    const defaultProjectId = workspace.projects[0]!.id;
+    const activeSessionId = workspace.activeSessionId;
+
+    const next = switchProject(workspace, defaultProjectId);
+
+    expect(next.activeProjectId).toBe(defaultProjectId);
+    expect(next.activeSessionId).toBe(activeSessionId);
+    expect(next.sessions).toEqual(workspace.sessions);
+  });
+
+  it("ignores unknown project ids", () => {
+    const workspace = createDefaultWorkspace();
+
+    expect(switchProject(workspace, "missing")).toBe(workspace);
+  });
+});
+
+describe("renameProject", () => {
+  it("renames the project and bumps updatedAt", () => {
+    const workspace = createDefaultWorkspace(() => "2026-08-11T00:00:00.000Z", sequentialIds());
+    const projectId = workspace.activeProjectId;
+
+    const next = renameProject(workspace, projectId, "周末计划", {
+      now: () => "2026-08-13T00:00:00.000Z",
+    });
+
+    expect(next.projects[0]!.name).toBe("周末计划");
+    expect(next.projects[0]!.updatedAt).toBe("2026-08-13T00:00:00.000Z");
+    expect(next.projects[0]!.createdAt).toBe("2026-08-11T00:00:00.000Z");
+  });
+});
+
+describe("deleteProject", () => {
+  const base = () => {
+    let workspace = createDefaultWorkspace(() => "2026-08-11T00:00:00.000Z", sequentialIds());
+    workspace = createProject(workspace, "东京行程", {
+      now: () => "2026-08-12T00:00:00.000Z",
+      createId: sequentialIds("p"),
+    });
+    return workspace;
+  };
+
+  it("unclassifies its sessions, keeps the active session, selects the first remaining project", () => {
+    const workspace = base();
+    const tokyoId = workspace.activeProjectId; // 东京行程 is active
+    const tokyoSessionId = workspace.activeSessionId;
+    const defaultProjectId = workspace.projects[0]!.id;
+
+    const next = deleteProject(workspace, tokyoId);
+
+    expect(next.projects.map((p) => p.id)).toEqual([defaultProjectId]);
+    const orphaned = next.sessions.find((s) => s.id === tokyoSessionId)!;
+    expect(orphaned.projectId).toBeNull();
+    expect(next.activeSessionId).toBe(tokyoSessionId);
+    expect(next.activeProjectId).toBe(defaultProjectId);
+  });
+
+  it("recreates the default project when the last one is deleted", () => {
+    const workspace = createDefaultWorkspace(() => "2026-08-11T00:00:00.000Z", sequentialIds());
+
+    const next = deleteProject(workspace, workspace.activeProjectId, {
+      now: () => "2026-08-14T00:00:00.000Z",
+      createId: () => "fresh-project",
+    });
+
+    expect(next.projects).toHaveLength(1);
+    expect(next.projects[0]!.id).toBe("fresh-project");
+    expect(next.projects[0]!.name).toBe("天气助手");
+    expect(next.activeProjectId).toBe("fresh-project");
+    expect(next.sessions[0]!.projectId).toBeNull();
+    expect(next.activeSessionId).toBe(workspace.activeSessionId);
+  });
+
+  it("keeps the active project when deleting another one", () => {
+    const workspace = base();
+    const defaultProjectId = workspace.projects[0]!.id;
+    const tokyoId = workspace.activeProjectId;
+
+    const next = deleteProject(workspace, defaultProjectId);
+
+    expect(next.activeProjectId).toBe(tokyoId);
+    expect(next.projects.map((p) => p.id)).toEqual([tokyoId]);
+  });
+
+  it("ignores unknown project ids", () => {
+    const workspace = createDefaultWorkspace();
+
+    expect(deleteProject(workspace, "missing")).toBe(workspace);
+  });
+});
+
+describe("filterSessionsByScope", () => {
+  const base = () => {
+    let workspace = createDefaultWorkspace(() => "2026-08-11T00:00:00.000Z", sequentialIds());
+    const defaultProjectId = workspace.activeProjectId;
+    const defaultSessionId = workspace.activeSessionId;
+    workspace = createProject(workspace, "东京行程", {
+      now: () => "2026-08-12T00:00:00.000Z",
+      createId: sequentialIds("p"),
+    });
+    const tokyoProjectId = workspace.activeProjectId;
+    const tokyoSessionId = workspace.activeSessionId;
+    workspace = deleteProject(workspace, tokyoProjectId);
+    // tokyoSession is now unclassified; defaultSession belongs to the default project
+    return { workspace, defaultProjectId, defaultSessionId, tokyoSessionId };
+  };
+
+  it("keeps only the given project's sessions in project scope", () => {
+    const { workspace, defaultProjectId, defaultSessionId } = base();
+
+    const visible = filterSessionsByScope(workspace.sessions, {
+      kind: "project",
+      projectId: defaultProjectId,
+    });
+
+    expect(visible.map((s) => s.id)).toEqual([defaultSessionId]);
+  });
+
+  it("keeps only unclassified sessions in unclassified scope", () => {
+    const { workspace, tokyoSessionId } = base();
+
+    const visible = filterSessionsByScope(workspace.sessions, { kind: "unclassified" });
+
+    expect(visible.map((s) => s.id)).toEqual([tokyoSessionId]);
+  });
+
+  it("keeps everything in all scope", () => {
+    const { workspace } = base();
+
+    expect(filterSessionsByScope(workspace.sessions, { kind: "all" }))
+      .toHaveLength(workspace.sessions.length);
+  });
+});
+
+describe("groupSessionHistory with scope", () => {
+  it("groups only the sessions visible in the given scope", () => {
+    let workspace = createDefaultWorkspace(() => "2026-08-11T00:00:00.000Z", sequentialIds());
+    const defaultProjectId = workspace.activeProjectId;
+    const defaultSessionId = workspace.activeSessionId;
+    workspace = setSessionMessages(workspace, defaultSessionId, [
+      { id: "m1", role: "user" as const, content: "天气" },
+    ], { now: () => "2026-08-11T00:00:00.000Z" });
+    workspace = createProject(workspace, "东京行程", {
+      now: () => "2026-08-12T00:00:00.000Z",
+      createId: sequentialIds("p"),
+    });
+    const tokyoSessionId = workspace.activeSessionId;
+    workspace = setSessionMessages(workspace, tokyoSessionId, [
+      { id: "m2", role: "user" as const, content: "东京天气" },
+    ], { now: () => "2026-08-12T00:00:00.000Z" });
+
+    const groups = groupSessionHistory(
+      workspace,
+      () => "2026-08-14T00:00:00.000Z",
+      { kind: "project", projectId: defaultProjectId },
+    );
+
+    expect(groups.earlier.map((s) => s.id)).toEqual([defaultSessionId]);
+    expect(groups.today).toEqual([]);
   });
 });

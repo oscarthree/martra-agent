@@ -27,6 +27,8 @@ export type WorkspaceState = {
   activeSessionId: string;
 };
 
+export const DEFAULT_PROJECT_NAME = "天气助手";
+
 export function createDefaultWorkspace(
   now: () => string = () => new Date().toISOString(),
   createId: () => string = () => crypto.randomUUID(),
@@ -37,14 +39,7 @@ export function createDefaultWorkspace(
 
   return {
     version: WORKSPACE_VERSION,
-    projects: [
-      {
-        id: projectId,
-        name: "天气助手",
-        createdAt: timestamp,
-        updatedAt: timestamp,
-      },
-    ],
+    projects: [emptyProject(projectId, DEFAULT_PROJECT_NAME, timestamp)],
     sessions: [
       {
         id: sessionId,
@@ -177,6 +172,10 @@ function resolveCreateId(
   return options.createId ?? (() => crypto.randomUUID());
 }
 
+function emptyProject(id: string, name: string, timestamp: string): Project {
+  return { id, name, createdAt: timestamp, updatedAt: timestamp };
+}
+
 function emptySession(
   id: string,
   projectId: string | null,
@@ -266,6 +265,92 @@ export function switchSession(
   return { ...workspace, activeSessionId: sessionId };
 }
 
+export function createProject(
+  workspace: WorkspaceState,
+  name: string,
+  options: SessionChangeOptions = {},
+): WorkspaceState {
+  const now = resolveNow(options);
+  const createId = resolveCreateId(options);
+  const timestamp = now();
+  const project = emptyProject(createId(), name, timestamp);
+  const session = emptySession(createId(), project.id, timestamp);
+
+  return {
+    ...workspace,
+    projects: [...workspace.projects, project],
+    sessions: [...workspace.sessions, session],
+    activeProjectId: project.id,
+    activeSessionId: session.id,
+  };
+}
+
+export function renameProject(
+  workspace: WorkspaceState,
+  projectId: string,
+  name: string,
+  options: Pick<SessionChangeOptions, "now"> = {},
+): WorkspaceState {
+  const now = resolveNow(options);
+  const timestamp = now();
+
+  return {
+    ...workspace,
+    projects: workspace.projects.map((project) =>
+      project.id === projectId
+        ? { ...project, name, updatedAt: timestamp }
+        : project,
+    ),
+  };
+}
+
+export function deleteProject(
+  workspace: WorkspaceState,
+  projectId: string,
+  options: SessionChangeOptions = {},
+): WorkspaceState {
+  if (!workspace.projects.some((project) => project.id === projectId)) {
+    return workspace;
+  }
+
+  const projects = workspace.projects.filter((project) => project.id !== projectId);
+  const sessions = workspace.sessions.map((session) =>
+    session.projectId === projectId ? { ...session, projectId: null } : session,
+  );
+
+  if (workspace.activeProjectId !== projectId) {
+    return { ...workspace, projects, sessions };
+  }
+
+  const fallback = projects[0];
+  if (fallback) {
+    return { ...workspace, projects, sessions, activeProjectId: fallback.id };
+  }
+
+  const now = resolveNow(options);
+  const createId = resolveCreateId(options);
+  const timestamp = now();
+  const project = emptyProject(createId(), DEFAULT_PROJECT_NAME, timestamp);
+
+  return {
+    ...workspace,
+    projects: [project],
+    sessions,
+    activeProjectId: project.id,
+  };
+}
+
+export function switchProject(
+  workspace: WorkspaceState,
+  projectId: string,
+): WorkspaceState {
+  if (!workspace.projects.some((project) => project.id === projectId)) {
+    return workspace;
+  }
+
+  return { ...workspace, activeProjectId: projectId };
+}
+
 export function deleteSession(
   workspace: WorkspaceState,
   sessionId: string,
@@ -303,6 +388,25 @@ function messageText(message: Message): string {
   return typeof message.content === "string" ? message.content : "";
 }
 
+export type HistoryScope =
+  | { kind: "project"; projectId: string }
+  | { kind: "unclassified" }
+  | { kind: "all" };
+
+export function filterSessionsByScope(
+  sessions: Session[],
+  scope: HistoryScope,
+): Session[] {
+  switch (scope.kind) {
+    case "project":
+      return sessions.filter((session) => session.projectId === scope.projectId);
+    case "unclassified":
+      return sessions.filter((session) => session.projectId === null);
+    case "all":
+      return sessions;
+  }
+}
+
 export function getSessionHistory(workspace: WorkspaceState): Session[] {
   return workspace.sessions
     .filter((session) => session.messages.some((message) => message.role === "user"))
@@ -318,6 +422,7 @@ export type SessionHistoryGroups = {
 export function groupSessionHistory(
   workspace: WorkspaceState,
   now: () => string = () => new Date().toISOString(),
+  scope: HistoryScope = { kind: "all" },
 ): SessionHistoryGroups {
   const current = new Date(now());
   const todayStart = new Date(
@@ -329,7 +434,8 @@ export function groupSessionHistory(
   yesterdayStart.setDate(yesterdayStart.getDate() - 1);
 
   const groups: SessionHistoryGroups = { today: [], yesterday: [], earlier: [] };
-  for (const session of getSessionHistory(workspace)) {
+  const visible = filterSessionsByScope(getSessionHistory(workspace), scope);
+  for (const session of visible) {
     const updated = new Date(session.updatedAt);
     if (updated >= todayStart) {
       groups.today.push(session);

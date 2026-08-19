@@ -11,15 +11,20 @@ import type { Message } from "@ag-ui/core";
 import "@copilotkit/react-core/v2/styles.css";
 import "./styles.css";
 import {
+  createProject,
   createSession,
+  deleteProject,
   deleteSession,
   groupSessionHistory,
   loadWorkspace,
   reconcileSessionMessages,
+  renameProject,
   renameSession,
   saveWorkspace,
   setSessionMessages,
+  switchProject,
   switchSession,
+  type HistoryScope,
   type Session,
   type SessionHistoryGroups,
   type WorkspaceState,
@@ -43,6 +48,10 @@ function App() {
       ? "工作区数据已重置，之前的本地记录无法恢复。"
       : null,
   );
+  const [historyScope, setHistoryScope] = useState<HistoryScope>({
+    kind: "project",
+    projectId: initialLoad.workspace.activeProjectId,
+  });
 
   // 轻量节流：消息流式更新会频繁改变工作区，延迟合并写入 localStorage。
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -65,8 +74,24 @@ function App() {
   if (!activeSession) {
     throw new Error("Active session missing from workspace");
   }
+  const activeProject = workspace.projects.find(
+    (project) => project.id === workspace.activeProjectId,
+  );
+  if (!activeProject) {
+    throw new Error("Active project missing from workspace");
+  }
 
-  const historyGroups = groupSessionHistory(workspace);
+  const historyGroups = groupSessionHistory(workspace, undefined, historyScope);
+
+  // historyScope 指向的项目被删除后，回退到新的 Active Project。
+  useEffect(() => {
+    if (
+      historyScope.kind === "project" &&
+      !workspace.projects.some((project) => project.id === historyScope.projectId)
+    ) {
+      setHistoryScope({ kind: "project", projectId: workspace.activeProjectId });
+    }
+  }, [workspace, historyScope]);
 
   const handleMessagesChange = useCallback(
     (messages: Message[]) => {
@@ -77,6 +102,47 @@ function App() {
     [activeSession.id],
   );
 
+  const handleSelectScope = (value: string) => {
+    if (value === "__create__") {
+      const name = window.prompt("项目名称");
+      if (!name || !name.trim()) return;
+      // 预生成 id：StrictMode 会重复执行 updater，id 必须保持确定
+      const ids = [crypto.randomUUID(), crypto.randomUUID()];
+      let call = 0;
+      setWorkspace((current) =>
+        createProject(current, name.trim(), {
+          createId: () => ids[call++ % 2]!,
+        }),
+      );
+      setHistoryScope({ kind: "project", projectId: ids[0]! });
+      return;
+    }
+    if (value === "unclassified" || value === "all") {
+      setHistoryScope({ kind: value });
+      return;
+    }
+    setWorkspace((current) => switchProject(current, value));
+    setHistoryScope({ kind: "project", projectId: value });
+  };
+
+  const handleRenameProject = () => {
+    const name = window.prompt("重命名项目", activeProject.name);
+    if (name && name.trim()) {
+      setWorkspace((current) =>
+        renameProject(current, activeProject.id, name.trim()),
+      );
+    }
+  };
+
+  const handleDeleteProject = () => {
+    if (
+      !window.confirm(`删除项目“${activeProject.name}”？其中的会话会移到未分类。`)
+    ) {
+      return;
+    }
+    setWorkspace((current) => deleteProject(current, activeProject.id));
+  };
+
   return (
     <CopilotKit
       runtimeUrl="/api/copilotkit"
@@ -84,6 +150,42 @@ function App() {
     >
       <main className="app-shell">
         <aside className="session-sidebar">
+          <div className="project-selector">
+            <select
+              aria-label="项目上下文选择器"
+              value={
+                historyScope.kind === "project"
+                  ? historyScope.projectId
+                  : historyScope.kind
+              }
+              onChange={(event) => handleSelectScope(event.target.value)}
+            >
+              <optgroup label="项目">
+                {workspace.projects.map((project) => (
+                  <option key={project.id} value={project.id}>
+                    {project.name}
+                  </option>
+                ))}
+              </optgroup>
+              <option value="unclassified">未分类</option>
+              <option value="all">全部历史</option>
+              <option value="__create__">＋ 新建项目</option>
+            </select>
+            {historyScope.kind === "project" && (
+              <span className="project-actions">
+                <button type="button" onClick={handleRenameProject}>
+                  改名
+                </button>
+                <button type="button" onClick={handleDeleteProject}>
+                  删除
+                </button>
+              </span>
+            )}
+          </div>
+          {(historyScope.kind !== "project" ||
+            historyScope.projectId !== activeProject.id) && (
+            <p className="active-project-caption">当前项目：{activeProject.name}</p>
+          )}
           <button
             type="button"
             className="new-session-button"
