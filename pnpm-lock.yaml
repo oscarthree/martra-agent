@@ -61,6 +61,9 @@ importers:
       express:
         specifier: ^5.2.1
         version: 5.2.1
+      lucide-react:
+        specifier: ^1.33.0
+        version: 1.33.0(react@19.2.8)
       mastra:
         specifier: ^1.19.0
         version: 1.19.0(@hono/node-server@1.19.14(hono@4.12.30))(@mastra/core@1.51.0(@bufbuild/protobuf@2.13.0)(@cfworker/json-schema@4.1.1)(ai@6.0.246(zod@4.4.3))(express@5.2.1)(rxjs@7.8.1)(zod@4.4.3))(rxjs@7.8.1)(typescript@5.9.3)(zod@4.4.3)
@@ -3991,6 +3994,11 @@ packages:
 
   lucide-react@0.542.0:
     resolution: {integrity: sha512-w3hD8/SQB7+lzU2r4VdFyzzOzKnUjTZIF/MQJGSSvni7Llewni4vuViRppfRAa2guOsY5k4jZyxw/i9DQHv+dw==}
+    peerDependencies:
+      react: ^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0
+
+  lucide-react@1.33.0:
+    resolution: {integrity: sha512-MTRwMy0ZlL8Ur/vOAiJ9XGHE+kFPC7brq6MxAm0GiGXEBj0qy0jA/pG4N675oSzciO/UCdX8T+5yUQdmDeTLxg==}
     peerDependencies:
       react: ^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0
 
@@ -10049,6 +10057,10 @@ snapshots:
       react: 19.2.8
 
   lucide-react@0.542.0(react@19.2.8):
+    dependencies:
+      react: 19.2.8
+
+  lucide-react@1.33.0(react@19.2.8):
     dependencies:
       react: 19.2.8
 

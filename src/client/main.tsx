@@ -8,6 +8,7 @@ import {
   useCopilotKit,
 } from "@copilotkit/react-core/v2";
 import type { Message } from "@ag-ui/core";
+import { Menu as MenuIcon, Plus } from "lucide-react";
 import "@copilotkit/react-core/v2/styles.css";
 import "./styles.css";
 import {
@@ -24,21 +25,32 @@ import {
   setSessionMessages,
   switchProject,
   switchSession,
+  validateProjectName,
   type HistoryScope,
+  type Project,
   type Session,
-  type SessionHistoryGroups,
   type WorkspaceState,
 } from "./workspace-state";
+import {
+  ConfirmDialog,
+  Drawer,
+  ProjectContextSelector,
+  ProjectFormDialog,
+  SessionRenameDialog,
+  SidebarContent,
+} from "./workspace-ui";
 
 const resourceId =
   localStorage.getItem("mastra-resource-id") ?? crypto.randomUUID();
 localStorage.setItem("mastra-resource-id", resourceId);
 
-const HISTORY_GROUP_LABELS: Array<[keyof SessionHistoryGroups, string]> = [
-  ["today", "今天"],
-  ["yesterday", "昨天"],
-  ["earlier", "更早"],
-];
+type DialogState =
+  | { kind: "project-create" }
+  | { kind: "project-rename"; project: Project }
+  | { kind: "session-rename"; session: Session }
+  | { kind: "project-delete"; project: Project }
+  | { kind: "session-delete"; session: Session }
+  | null;
 
 function App() {
   const [initialLoad] = useState(() => loadWorkspace(localStorage));
@@ -52,6 +64,9 @@ function App() {
     kind: "project",
     projectId: initialLoad.workspace.activeProjectId,
   });
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [dialog, setDialog] = useState<DialogState>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
 
   // 轻量节流：消息流式更新会频繁改变工作区，延迟合并写入 localStorage。
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -102,158 +117,187 @@ function App() {
     [activeSession.id],
   );
 
-  const handleSelectScope = (value: string) => {
-    if (value === "__create__") {
-      const name = window.prompt("项目名称");
-      if (!name || !name.trim()) return;
-      // 预生成 id：StrictMode 会重复执行 updater，id 必须保持确定
-      const ids = [crypto.randomUUID(), crypto.randomUUID()];
-      let call = 0;
-      setWorkspace((current) =>
-        createProject(current, name.trim(), {
-          createId: () => ids[call++ % 2]!,
-        }),
-      );
-      setHistoryScope({ kind: "project", projectId: ids[0]! });
-      return;
-    }
-    if (value === "unclassified" || value === "all") {
-      setHistoryScope({ kind: value });
-      return;
-    }
-    setWorkspace((current) => switchProject(current, value));
-    setHistoryScope({ kind: "project", projectId: value });
+  const closeDrawer = useCallback(() => {
+    setDrawerOpen(false);
+    menuButtonRef.current?.focus();
+  }, []);
+
+  const handleNewSession = useCallback(() => {
+    setWorkspace((current) => createSession(current));
+    closeDrawer();
+  }, [closeDrawer]);
+
+  const handleSelectProject = useCallback(
+    (projectId: string) => {
+      setWorkspace((current) => switchProject(current, projectId));
+      setHistoryScope({ kind: "project", projectId });
+      closeDrawer();
+    },
+    [closeDrawer],
+  );
+
+  const handleOpenSession = useCallback((sessionId: string) => {
+    setWorkspace((current) => switchSession(current, sessionId));
+    closeDrawer();
+  }, [closeDrawer]);
+
+  const handleCreateProject = (name: string) => {
+    // 预生成 id：StrictMode 会重复执行 updater，id 必须保持确定
+    const ids = [crypto.randomUUID(), crypto.randomUUID()];
+    let call = 0;
+    setWorkspace((current) =>
+      createProject(current, name, { createId: () => ids[call++ % 2]! }),
+    );
+    setHistoryScope({ kind: "project", projectId: ids[0]! });
   };
 
-  const handleRenameProject = () => {
-    const name = window.prompt("重命名项目", activeProject.name);
-    if (name && name.trim()) {
-      setWorkspace((current) =>
-        renameProject(current, activeProject.id, name.trim()),
-      );
-    }
-  };
-
-  const handleDeleteProject = () => {
-    if (
-      !window.confirm(`删除项目“${activeProject.name}”？其中的会话会移到未分类。`)
-    ) {
-      return;
-    }
-    setWorkspace((current) => deleteProject(current, activeProject.id));
-  };
+  const sidebar = (
+    <SidebarContent
+      workspace={workspace}
+      historyScope={historyScope}
+      groups={historyGroups}
+      onNewSession={handleNewSession}
+      onShowActiveProject={() => {
+        setHistoryScope({ kind: "project", projectId: workspace.activeProjectId });
+        closeDrawer();
+      }}
+      onShowAllHistory={() => {
+        setHistoryScope({ kind: "all" });
+        closeDrawer();
+      }}
+      onSelectProject={handleSelectProject}
+      onOpenSession={handleOpenSession}
+      onRenameSession={(session) => {
+        // 弹窗挂载在抽屉之外：先关抽屉，避免焦点陷阱冲突
+        setDrawerOpen(false);
+        setDialog({ kind: "session-rename", session });
+      }}
+      onDeleteSession={(session) => {
+        setDrawerOpen(false);
+        setDialog({ kind: "session-delete", session });
+      }}
+    />
+  );
 
   return (
     <CopilotKit
       runtimeUrl="/api/copilotkit"
       headers={{ "x-mastra-resource-id": resourceId }}
+      enableInspector={false}
     >
-      <main className="app-shell">
-        <aside className="session-sidebar">
-          <div className="project-selector">
-            <select
-              aria-label="项目上下文选择器"
-              value={
-                historyScope.kind === "project"
-                  ? historyScope.projectId
-                  : historyScope.kind
-              }
-              onChange={(event) => handleSelectScope(event.target.value)}
+      <main className="workspace">
+        <aside className="sidebar">{sidebar}</aside>
+        <div className="main">
+          <header className="topbar">
+            <button
+              type="button"
+              ref={menuButtonRef}
+              className="icon-button mobile-menu"
+              aria-label="打开工作区菜单"
+              title="打开工作区菜单"
+              onClick={() => setDrawerOpen(true)}
             >
-              <optgroup label="项目">
-                {workspace.projects.map((project) => (
-                  <option key={project.id} value={project.id}>
-                    {project.name}
-                  </option>
-                ))}
-              </optgroup>
-              <option value="unclassified">未分类</option>
-              <option value="all">全部历史</option>
-              <option value="__create__">＋ 新建项目</option>
-            </select>
-            {historyScope.kind === "project" && (
-              <span className="project-actions">
-                <button type="button" onClick={handleRenameProject}>
-                  改名
-                </button>
-                <button type="button" onClick={handleDeleteProject}>
-                  删除
-                </button>
-              </span>
-            )}
-          </div>
-          {(historyScope.kind !== "project" ||
-            historyScope.projectId !== activeProject.id) && (
-            <p className="active-project-caption">当前项目：{activeProject.name}</p>
-          )}
-          <button
-            type="button"
-            className="new-session-button"
-            onClick={() => setWorkspace((current) => createSession(current))}
-          >
-            + 新建会话
-          </button>
-          <nav className="session-history" aria-label="会话历史">
-            {HISTORY_GROUP_LABELS.map(([key, label]) =>
-              historyGroups[key].length === 0 ? null : (
-                <section className="session-group" key={key}>
-                  <h2>{label}</h2>
-                  <ul>
-                    {historyGroups[key].map((session) => (
-                      <SessionItem
-                        key={session.id}
-                        session={session}
-                        active={session.id === workspace.activeSessionId}
-                        onOpen={() =>
-                          setWorkspace((current) =>
-                            switchSession(current, session.id),
-                          )
-                        }
-                        onRename={() => {
-                          const title = window.prompt("重命名会话", session.title);
-                          if (title && title.trim()) {
-                            setWorkspace((current) =>
-                              renameSession(current, session.id, title.trim()),
-                            );
-                          }
-                        }}
-                        onDelete={() => {
-                          if (window.confirm(`删除会话“${session.title}”？`)) {
-                            setWorkspace((current) =>
-                              deleteSession(current, session.id),
-                            );
-                          }
-                        }}
-                      />
-                    ))}
-                  </ul>
-                </section>
-              ),
-            )}
-          </nav>
-        </aside>
-        <section className="intro-panel">
-          <p className="eyebrow">WEATHER DESK / 01</p>
-          <h1>Plan the day around the sky.</h1>
-          <p className="lede">
-            Ask for current conditions, a forecast, or a weather-aware plan for
-            your next trip.
-          </p>
-          <div className="prompt-grid" aria-label="Suggested prompts">
-            <span>Beijing this weekend</span>
-            <span>Rain-safe afternoon in London</span>
-            <span>What should I pack for Tokyo?</span>
-          </div>
-          <p className="status-line"><span /> Live weather assistant</p>
-        </section>
-        <section className="chat-panel">
-          <header className="chat-header">{activeSession.title}</header>
-          <WorkspaceChat
-            session={activeSession}
-            onMessagesChange={handleMessagesChange}
-          />
-        </section>
+              <MenuIcon size={20} aria-hidden />
+            </button>
+            <ProjectContextSelector
+              workspace={workspace}
+              historyScope={historyScope}
+              onSelectProject={handleSelectProject}
+              onSelectUnclassified={() => setHistoryScope({ kind: "unclassified" })}
+              onSelectAll={() => setHistoryScope({ kind: "all" })}
+              onCreateProject={() => setDialog({ kind: "project-create" })}
+              onRenameProject={(project) =>
+                setDialog({ kind: "project-rename", project })
+              }
+              onDeleteProject={(project) =>
+                setDialog({ kind: "project-delete", project })
+              }
+            />
+            <div className="top-actions">
+              <button
+                type="button"
+                className="icon-button"
+                aria-label="新建会话"
+                title="新建会话"
+                onClick={handleNewSession}
+              >
+                <Plus size={18} aria-hidden />
+              </button>
+            </div>
+          </header>
+          <section className="chat-panel">
+            <WorkspaceChat
+              session={activeSession}
+              onMessagesChange={handleMessagesChange}
+            />
+          </section>
+        </div>
+        {drawerOpen && <Drawer onClose={closeDrawer}>{sidebar}</Drawer>}
       </main>
+
+      {dialog?.kind === "project-create" && (
+        <ProjectFormDialog
+          mode="create"
+          validate={(name) => validateProjectName(workspace, name)}
+          onSubmit={handleCreateProject}
+          onClose={() => setDialog(null)}
+        />
+      )}
+      {dialog?.kind === "project-rename" && (
+        <ProjectFormDialog
+          mode="rename"
+          initialName={dialog.project.name}
+          validate={(name) =>
+            name.trim() === dialog.project.name
+              ? null
+              : validateProjectName(workspace, name)
+          }
+          onSubmit={(name) =>
+            setWorkspace((current) =>
+              renameProject(current, dialog.project.id, name),
+            )
+          }
+          onClose={() => setDialog(null)}
+        />
+      )}
+      {dialog?.kind === "session-rename" && (
+        <SessionRenameDialog
+          initialTitle={dialog.session.title}
+          onSubmit={(title) =>
+            setWorkspace((current) =>
+              renameSession(current, dialog.session.id, title),
+            )
+          }
+          onClose={() => setDialog(null)}
+        />
+      )}
+      {dialog?.kind === "project-delete" && (
+        <ConfirmDialog
+          title="删除项目"
+          body={`删除项目“${dialog.project.name}”？其中的会话会移到未分类，不会被删除。`}
+          confirmLabel="删除项目"
+          onConfirm={() =>
+            setWorkspace((current) =>
+              deleteProject(current, dialog.project.id),
+            )
+          }
+          onClose={() => setDialog(null)}
+        />
+      )}
+      {dialog?.kind === "session-delete" && (
+        <ConfirmDialog
+          title="删除会话"
+          body={`删除会话“${dialog.session.title}”？此操作不可撤销。`}
+          confirmLabel="删除会话"
+          onConfirm={() =>
+            setWorkspace((current) =>
+              deleteSession(current, dialog.session.id),
+            )
+          }
+          onClose={() => setDialog(null)}
+        />
+      )}
+
       {notice && (
         <div
           className="workspace-notice"
@@ -267,33 +311,26 @@ function App() {
   );
 }
 
-function SessionItem({
-  session,
-  active,
-  onOpen,
-  onRename,
-  onDelete,
-}: {
-  session: Session;
-  active: boolean;
-  onOpen: () => void;
-  onRename: () => void;
-  onDelete: () => void;
-}) {
+function Welcome({ onPick }: { onPick: (text: string) => void }) {
   return (
-    <li className={active ? "session-item active" : "session-item"}>
-      <button type="button" className="session-open" onClick={onOpen}>
-        {session.title}
-      </button>
-      <span className="session-actions">
-        <button type="button" onClick={onRename} aria-label="重命名会话">
-          改名
+    <div className="welcome">
+      <div className="welcome-kicker">LIVE WEATHER ASSISTANT</div>
+      <h1>今天想去哪里？</h1>
+      <p className="welcome-copy">
+        告诉我一个城市、天气问题，或者你的下一段旅程。我会结合实时天气，帮你把一天安排得更从容。
+      </p>
+      <div className="suggestions" aria-label="推荐问题">
+        <button type="button" className="suggestion" onClick={() => onPick("北京周末天气怎么样？")}>
+          北京周末天气
         </button>
-        <button type="button" onClick={onDelete} aria-label="删除会话">
-          删除
+        <button type="button" className="suggestion" onClick={() => onPick("帮我安排大连三天行程")}>
+          大连三天行程
         </button>
-      </span>
-    </li>
+        <button type="button" className="suggestion" onClick={() => onPick("东京今天适合带什么？")}>
+          东京出行建议
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -311,6 +348,8 @@ function WorkspaceChat({
     updates: [UseAgentUpdate.OnMessagesChanged, UseAgentUpdate.OnRunStatusChanged],
   });
   const { copilotkit } = useCopilotKit();
+  const [inputValue, setInputValue] = useState("");
+  const [sendError, setSendError] = useState<string | null>(null);
 
   useEffect(() => {
     const sync = reconcileSessionMessages(agent.messages, session.messages);
@@ -322,20 +361,54 @@ function WorkspaceChat({
     }
   }, [agent, agent.messages, session, onMessagesChange]);
 
+  const runAgent = async () => {
+    try {
+      setSendError(null);
+      await copilotkit.runAgent({ agent });
+    } catch {
+      setSendError("发送失败，请检查网络后重试。");
+    }
+  };
+
   return (
     <CopilotChatView
       className="chat-view"
       messages={agent.messages}
       isRunning={agent.isRunning}
+      welcomeScreen={false}
+      inputValue={inputValue}
+      onInputChange={setInputValue}
       onSubmitMessage={async (text) => {
         agent.addMessage({
           id: crypto.randomUUID(),
           role: "user",
           content: text,
         });
-        await copilotkit.runAgent({ agent });
+        setInputValue("");
+        await runAgent();
       }}
-    />
+    >
+      {({ scrollView, input }) => (
+        <>
+          <div className="chat-scroll">
+            {agent.messages.length === 0 ? (
+              <Welcome onPick={setInputValue} />
+            ) : (
+              scrollView
+            )}
+          </div>
+          {sendError && (
+            <div className="send-error" role="alert">
+              <span>{sendError}</span>
+              <button type="button" onClick={() => void runAgent()}>
+                重试
+              </button>
+            </div>
+          )}
+          {input}
+        </>
+      )}
+    </CopilotChatView>
   );
 }
 

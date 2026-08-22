@@ -265,6 +265,18 @@ export function switchSession(
   return { ...workspace, activeSessionId: sessionId };
 }
 
+export function validateProjectName(
+  workspace: WorkspaceState,
+  name: string,
+): string | null {
+  const trimmed = name.trim();
+  if (!trimmed) return "请输入项目名称";
+  if (workspace.projects.some((project) => project.name === trimmed)) {
+    return "项目已存在";
+  }
+  return null;
+}
+
 export function createProject(
   workspace: WorkspaceState,
   name: string,

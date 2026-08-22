@@ -46,7 +46,7 @@ weatherAgent
 - **运行时**：Node.js 24 或更高版本；包管理器 pnpm 10 或更高版本
 - **后端**：Express 5 + TypeScript（ESM，`"type": "module"`），通过 `tsx` 直接运行 TS
 - **AI 框架**：Mastra（`@mastra/core`、`@mastra/express`、`@mastra/memory` 等），模型通过 `@ai-sdk/openai-compatible` 连接 Moonshot
-- **前端**：React 19 + Vite + `@copilotkit/react-core` / `react-ui`（v2 API）
+- **前端**：React 19 + Vite + `@copilotkit/react-core` / `react-ui`（v2 API），图标使用 `lucide-react`
 - **存储**：LibSQL（本地文件 `mastra.db`，部署时可切换 Turso）保存应用数据，DuckDB（`mastra.duckdb`）保存可观测性数据
 - **校验**：zod v4
 - **测试**：Vitest
@@ -81,8 +81,9 @@ weatherAgent
 src/
 ├── index.ts                         # Express 服务入口：MastraServer、CopilotKit Runtime v2、/api/copilotkit 路由
 ├── client/
-│   ├── main.tsx                     # CopilotKit Chat 入口（React 19，CopilotKit v2 API）
-│   ├── styles.css                   # 前端样式
+│   ├── main.tsx                     # 工作区应用入口：Workspace 状态接线、受控 CopilotChatView、对话框调度
+│   ├── workspace-ui.tsx             # 工作区展示组件：侧栏、Project Context Selector、抽屉、弹窗
+│   ├── styles.css                   # 前端样式（浅色主题，--wc-* 变量避免与 CopilotKit 主题冲突）
 │   ├── workspace-state.ts           # 工作区/项目/会话的本地状态模型（localStorage 持久化）
 │   └── workspace-state.test.ts      # 工作区状态测试
 └── mastra/

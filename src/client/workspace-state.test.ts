@@ -19,6 +19,7 @@ import {
   setSessionMessages,
   switchProject,
   switchSession,
+  validateProjectName,
 } from "./workspace-state";
 
 function sequentialIds(prefix = "id") {
@@ -586,5 +587,25 @@ describe("groupSessionHistory with scope", () => {
 
     expect(groups.earlier.map((s) => s.id)).toEqual([defaultSessionId]);
     expect(groups.today).toEqual([]);
+  });
+});
+
+describe("validateProjectName", () => {
+  it("rejects an empty name", () => {
+    const workspace = createDefaultWorkspace();
+
+    expect(validateProjectName(workspace, "   ")).toBe("请输入项目名称");
+  });
+
+  it("rejects a duplicate name", () => {
+    const workspace = createDefaultWorkspace();
+
+    expect(validateProjectName(workspace, "天气助手")).toBe("项目已存在");
+  });
+
+  it("accepts a new distinct name", () => {
+    const workspace = createDefaultWorkspace();
+
+    expect(validateProjectName(workspace, "东京行程")).toBeNull();
   });
 });
