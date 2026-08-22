@@ -2,7 +2,7 @@
 
 - Type: `wayfinder:prototype`
 - Parent map: [通用多模态对话助手](../maps/general-multimodal-agent.md)
-- Status: open
+- Status: closed
 - Blocking: 编写通用助手实现规格
 
 ## Question
@@ -16,3 +16,12 @@
 - 大图（接近 20MB 附件上限）的发送行为与失败表现。
 
 原型为一次性代码，放在 `prototype/` 下，不进主构建。
+
+## Resolution
+
+不再单独做一次性原型，改为在规格阶段收敛：
+
+- 链路机制已由[多模态链路可行性研究](confirm-multimodal-chain-feasibility.md)从类型定义层面确认（CopilotKit 默认 base64 data URL、`toMastraContent` 自动转换图片 part、模型即视觉模型），无需补丁。
+- 实时全链路验证（模型实际"看到"图片并回答）转为[通用助手实现规格](implement-general-assistant.md)的验收门槛：实现完成后必须在浏览器中实际发图问答通过，才视为完成。
+- 快照降级的占位符决策不再依赖原型实测结构：统一约定为"持久化前将 image/binary content part 替换为文本占位 part"，已写入规格。
+- 多轮历史图片重复上行的体积开销本轮接受；大图体验留作后续调优。

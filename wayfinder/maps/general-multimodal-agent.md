@@ -22,12 +22,22 @@
 - 已在对话中确认：图片原图直发，不做前端压缩；压缩优化凭实际体验再决策。
 - 已在对话中确认：空状态文案按项目类型区分，通用助手项目显示通用欢迎语。
 - [确认多模态链路可行性](../tickets/confirm-multimodal-chain-feasibility.md) — 当前 Moonshot 模型即视觉模型、Mastra 原生支持多模态消息、CopilotKit v2 内置附件能力（受控视图需 `useAttachments` 手动接线），全链路无需补丁。
+- [定义项目 Agent 类型绑定与工作区状态扩展](../tickets/define-project-agent-type-binding.md) — Project 与 Session 均带 `agentType`（Session 创建时捕获）；存储 key 不变、v1 原地迁移到 v2；新建项目弹窗选类型且创建后不可改；`runtimeAgentId` 按会话类型推导。
+- [验证受控附件接线与图片全链路](../tickets/verify-controlled-attachment-pipeline.md) — 不再单独做原型；实时全链路发图问答转为实现规格的验收门槛，占位符结构在规格中统一定义。
+- [编写通用助手实现规格](../tickets/implement-general-assistant.md) — `ready-for-agent` 实现规格，覆盖 generalAgent 定义与注册、类型绑定与 v1→v2 迁移、受控附件接线、快照占位符降级、按类型区分的空状态和验收标准。
+
+## Implementation tickets
+
+- [01 — 后端并列注册通用助手 agent](../../.scratch/general-multimodal-agent/issues/01-general-agent-backend.md) — 无阻塞，可立即开始。
+- [02 — 工作区状态 v2：项目/会话类型与原地迁移](../../.scratch/general-multimodal-agent/issues/02-workspace-state-v2-agent-type.md) — 无阻塞，可立即开始。
+- [03 — 项目类型选择与会话 agent 路由](../../.scratch/general-multimodal-agent/issues/03-project-type-selection-and-agent-routing.md) — 阻塞于 01、02。
+- [04 — 通用会话的图片附件与快照占位降级](../../.scratch/general-multimodal-agent/issues/04-image-attachments-and-snapshot-placeholder.md) — 阻塞于 03。
+- [05 — 端到端验收与文档同步](../../.scratch/general-multimodal-agent/issues/05-e2e-acceptance-and-docs.md) — 阻塞于 04。
 
 ## Not yet specified
 
 - 大图体验：原图直发在多大尺寸下开始明显变慢，何时引入前端压缩。
 - 通用助手未来是否需要工具能力（联网搜索等），目前定位纯对话。
-- 历史消息里图片占位符的具体渲染样式和文案。
 - 视频输入（模型侧已支持，本轮不铺开）。
 
 ## Out of scope
