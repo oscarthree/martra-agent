@@ -66,6 +66,7 @@ function App() {
   });
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [dialog, setDialog] = useState<DialogState>(null);
+  const [chatError, setChatError] = useState<string | null>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
 
   // 轻量节流：消息流式更新会频繁改变工作区，延迟合并写入 localStorage。
@@ -229,6 +230,8 @@ function App() {
             <WorkspaceChat
               session={activeSession}
               onMessagesChange={handleMessagesChange}
+              sendError={chatError}
+              onSendErrorChange={setChatError}
             />
           </section>
         </div>
@@ -337,9 +340,13 @@ function Welcome({ onPick }: { onPick: (text: string) => void }) {
 function WorkspaceChat({
   session,
   onMessagesChange,
+  sendError,
+  onSendErrorChange,
 }: {
   session: Session;
   onMessagesChange: (messages: Message[]) => void;
+  sendError: string | null;
+  onSendErrorChange: (error: string | null) => void;
 }) {
   const { agent } = useAgent({
     agentId: `workspace-session-${session.id}`,
@@ -349,7 +356,14 @@ function WorkspaceChat({
   });
   const { copilotkit } = useCopilotKit();
   const [inputValue, setInputValue] = useState("");
-  const [sendError, setSendError] = useState<string | null>(null);
+
+  // runAgent 失败不会 reject：错误经 agent 订阅的 onRunFailed 上报
+  useEffect(() => {
+    const subscription = agent.subscribe({
+      onRunFailed: () => onSendErrorChange("发送失败，请检查网络后重试。"),
+    });
+    return () => subscription.unsubscribe();
+  }, [agent, onSendErrorChange]);
 
   useEffect(() => {
     const sync = reconcileSessionMessages(agent.messages, session.messages);
@@ -363,16 +377,15 @@ function WorkspaceChat({
 
   const runAgent = async () => {
     try {
-      setSendError(null);
+      onSendErrorChange(null);
       await copilotkit.runAgent({ agent });
     } catch {
-      setSendError("发送失败，请检查网络后重试。");
+      onSendErrorChange("发送失败，请检查网络后重试。");
     }
   };
 
   return (
     <CopilotChatView
-      className="chat-view"
       messages={agent.messages}
       isRunning={agent.isRunning}
       welcomeScreen={false}
@@ -400,9 +413,18 @@ function WorkspaceChat({
           {sendError && (
             <div className="send-error" role="alert">
               <span>{sendError}</span>
-              <button type="button" onClick={() => void runAgent()}>
-                重试
-              </button>
+              <span className="send-error-actions">
+                <button type="button" onClick={() => void runAgent()}>
+                  重试
+                </button>
+                <button
+                  type="button"
+                  aria-label="关闭错误提示"
+                  onClick={() => onSendErrorChange(null)}
+                >
+                  关闭
+                </button>
+              </span>
             </div>
           )}
           {input}

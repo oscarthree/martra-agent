@@ -479,7 +479,7 @@ export function ProjectFormDialog({
           if (event.key === "Enter") submit();
         }}
       />
-      <div className="field-error" role="alert">
+      <div className="field-error" role="alert" title={error ?? undefined}>
         {error ?? ""}
       </div>
       <div className="modal-actions">

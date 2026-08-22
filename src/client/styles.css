@@ -289,8 +289,6 @@ button { border: 0; cursor: pointer; color: inherit; background: none; }
   display: flex;
   flex-direction: column;
 }
-.chat-view { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-.chat-view > * { min-height: 0; }
 .chat-scroll {
   flex: 1;
   min-height: 0;
@@ -299,13 +297,6 @@ button { border: 0; cursor: pointer; color: inherit; background: none; }
   flex-direction: column;
 }
 .chat-scroll > * {
-  width: min(780px, calc(100% - 42px));
-  margin-left: auto;
-  margin-right: auto;
-}
-/* CopilotChatView 内部 DOM 没有稳定类名：用结构位置约束输入区宽度。
-   上游 @copilotkit/react-core 升级后若布局漂移，先检查这里。 */
-.chat-view [class*="input"], .chat-view > div:last-child {
   width: min(780px, calc(100% - 42px));
   margin-left: auto;
   margin-right: auto;
@@ -357,6 +348,7 @@ button { border: 0; cursor: pointer; color: inherit; background: none; }
   font-size: 12px;
   text-decoration: underline;
 }
+.send-error-actions { display: inline-flex; gap: 10px; flex: none; }
 
 /* ---------- Drawer & dialogs ---------- */
 
@@ -407,8 +399,11 @@ button { border: 0; cursor: pointer; color: inherit; background: none; }
 }
 .modal input:focus-visible { outline: 3px solid var(--wc-focus-ring); border-color: var(--wc-accent); }
 .field-error {
-  min-height: 20px;
-  padding-top: 5px;
+  height: 24px;
+  padding-top: 6px;
+  line-height: 18px;
+  overflow: hidden;
+  white-space: nowrap;
   color: var(--wc-error);
   font-size: 12px;
 }
