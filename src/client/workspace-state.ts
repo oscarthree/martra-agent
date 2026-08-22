@@ -1,11 +1,14 @@
 import { MessageSchema, type Message } from "@ag-ui/core";
 
-export const WORKSPACE_VERSION = 1;
+export const WORKSPACE_VERSION = 2;
 export const WORKSPACE_STORAGE_KEY = "weather-copilot-workspace-v1";
+
+export type AgentType = "weather" | "general";
 
 export type Project = {
   id: string;
   name: string;
+  agentType: AgentType;
   createdAt: string;
   updatedAt: string;
 };
@@ -13,6 +16,7 @@ export type Project = {
 export type Session = {
   id: string;
   projectId: string | null;
+  agentType: AgentType;
   title: string;
   messages: Message[];
   createdAt: string;
@@ -28,6 +32,7 @@ export type WorkspaceState = {
 };
 
 export const DEFAULT_PROJECT_NAME = "天气助手";
+export const DEFAULT_AGENT_TYPE: AgentType = "weather";
 
 export function createDefaultWorkspace(
   now: () => string = () => new Date().toISOString(),
@@ -39,11 +44,12 @@ export function createDefaultWorkspace(
 
   return {
     version: WORKSPACE_VERSION,
-    projects: [emptyProject(projectId, DEFAULT_PROJECT_NAME, timestamp)],
+    projects: [emptyProject(projectId, DEFAULT_PROJECT_NAME, timestamp, DEFAULT_AGENT_TYPE)],
     sessions: [
       {
         id: sessionId,
         projectId,
+        agentType: DEFAULT_AGENT_TYPE,
         title: DEFAULT_SESSION_TITLE,
         messages: [],
         createdAt: timestamp,
@@ -68,11 +74,42 @@ export function parseWorkspace(serialized: string): WorkspaceState {
     throw new Error("Invalid workspace state");
   }
 
-  if (!isWorkspaceState(value)) {
+  const migrated = migrateWorkspace(value);
+  if (!isWorkspaceState(migrated)) {
     throw new Error("Invalid workspace state");
   }
 
-  return value;
+  return migrated;
+}
+
+// Version 1 payloads predate project agent types. Upgrade them in place by
+// stamping every project and session as "weather" — the only assistant that
+// existed then — before validating against the current schema.
+function migrateWorkspace(value: unknown): unknown {
+  if (!value || typeof value !== "object") return value;
+
+  const workspace = value as {
+    version?: unknown;
+    projects?: unknown;
+    sessions?: unknown;
+  };
+  if (workspace.version !== 1) return value;
+
+  const stamp = (item: unknown) =>
+    item && typeof item === "object"
+      ? { ...item, agentType: DEFAULT_AGENT_TYPE }
+      : item;
+
+  return {
+    ...workspace,
+    version: WORKSPACE_VERSION,
+    projects: Array.isArray(workspace.projects)
+      ? workspace.projects.map(stamp)
+      : workspace.projects,
+    sessions: Array.isArray(workspace.sessions)
+      ? workspace.sessions.map(stamp)
+      : workspace.sessions,
+  };
 }
 
 export type WorkspaceStorage = Pick<Storage, "getItem" | "setItem"> &
@@ -172,23 +209,40 @@ function resolveCreateId(
   return options.createId ?? (() => crypto.randomUUID());
 }
 
-function emptyProject(id: string, name: string, timestamp: string): Project {
-  return { id, name, createdAt: timestamp, updatedAt: timestamp };
+function emptyProject(
+  id: string,
+  name: string,
+  timestamp: string,
+  agentType: AgentType,
+): Project {
+  return { id, name, agentType, createdAt: timestamp, updatedAt: timestamp };
 }
 
 function emptySession(
   id: string,
   projectId: string | null,
   timestamp: string,
+  agentType: AgentType,
 ): Session {
   return {
     id,
     projectId,
+    agentType,
     title: DEFAULT_SESSION_TITLE,
     messages: [],
     createdAt: timestamp,
     updatedAt: timestamp,
   };
+}
+
+function agentTypeForProject(
+  workspace: WorkspaceState,
+  projectId: string | null,
+): AgentType {
+  return (
+    workspace.projects.find((project) => project.id === projectId)?.agentType ??
+    DEFAULT_AGENT_TYPE
+  );
 }
 
 export function createSession(
@@ -198,7 +252,12 @@ export function createSession(
   const now = resolveNow(options);
   const createId = resolveCreateId(options);
   const timestamp = now();
-  const session = emptySession(createId(), workspace.activeProjectId, timestamp);
+  const session = emptySession(
+    createId(),
+    workspace.activeProjectId,
+    timestamp,
+    agentTypeForProject(workspace, workspace.activeProjectId),
+  );
 
   return {
     ...workspace,
@@ -280,13 +339,18 @@ export function validateProjectName(
 export function createProject(
   workspace: WorkspaceState,
   name: string,
-  options: SessionChangeOptions = {},
+  options: SessionChangeOptions & { agentType?: AgentType } = {},
 ): WorkspaceState {
   const now = resolveNow(options);
   const createId = resolveCreateId(options);
   const timestamp = now();
-  const project = emptyProject(createId(), name, timestamp);
-  const session = emptySession(createId(), project.id, timestamp);
+  const project = emptyProject(
+    createId(),
+    name,
+    timestamp,
+    options.agentType ?? DEFAULT_AGENT_TYPE,
+  );
+  const session = emptySession(createId(), project.id, timestamp, project.agentType);
 
   return {
     ...workspace,
@@ -342,7 +406,7 @@ export function deleteProject(
   const now = resolveNow(options);
   const createId = resolveCreateId(options);
   const timestamp = now();
-  const project = emptyProject(createId(), DEFAULT_PROJECT_NAME, timestamp);
+  const project = emptyProject(createId(), DEFAULT_PROJECT_NAME, timestamp, DEFAULT_AGENT_TYPE);
 
   return {
     ...workspace,
@@ -387,7 +451,12 @@ export function deleteSession(
   const now = resolveNow(options);
   const createId = resolveCreateId(options);
   const timestamp = now();
-  const session = emptySession(createId(), target.projectId, timestamp);
+  const session = emptySession(
+    createId(),
+    target.projectId,
+    timestamp,
+    agentTypeForProject(workspace, target.projectId),
+  );
 
   return {
     ...workspace,
@@ -492,6 +561,10 @@ function isWorkspaceState(value: unknown): value is WorkspaceState {
   );
 }
 
+function isAgentType(value: unknown): value is AgentType {
+  return value === "weather" || value === "general";
+}
+
 function isProject(value: unknown): value is Project {
   if (!value || typeof value !== "object") return false;
 
@@ -499,6 +572,7 @@ function isProject(value: unknown): value is Project {
   return (
     typeof project.id === "string" &&
     typeof project.name === "string" &&
+    isAgentType(project.agentType) &&
     typeof project.createdAt === "string" &&
     typeof project.updatedAt === "string"
   );
@@ -511,6 +585,7 @@ function isSession(value: unknown): value is Session {
   return (
     typeof session.id === "string" &&
     (typeof session.projectId === "string" || session.projectId === null) &&
+    isAgentType(session.agentType) &&
     typeof session.title === "string" &&
     Array.isArray(session.messages) &&
     session.messages.every((message) => MessageSchema.safeParse(message).success) &&

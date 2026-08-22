@@ -609,3 +609,159 @@ describe("validateProjectName", () => {
     expect(validateProjectName(workspace, "东京行程")).toBeNull();
   });
 });
+
+describe("agentType binding", () => {
+  it("marks the default project and session as weather", () => {
+    const workspace = createDefaultWorkspace(
+      () => "2026-08-11T00:00:00.000Z",
+      sequentialIds(),
+    );
+
+    expect(workspace.projects[0]?.agentType).toBe("weather");
+    expect(workspace.sessions[0]?.agentType).toBe("weather");
+  });
+
+  it("captures the project type on the session created with the project", () => {
+    let workspace = createDefaultWorkspace(
+      () => "2026-08-11T00:00:00.000Z",
+      sequentialIds(),
+    );
+    workspace = createProject(workspace, "随便聊聊", {
+      now: () => "2026-08-12T00:00:00.000Z",
+      createId: sequentialIds("p"),
+      agentType: "general",
+    });
+
+    expect(workspace.projects[1]?.agentType).toBe("general");
+    const session = workspace.sessions.find((s) => s.id === workspace.activeSessionId);
+    expect(session?.projectId).toBe(workspace.projects[1]?.id);
+    expect(session?.agentType).toBe("general");
+  });
+
+  it("captures the active project type on later new sessions", () => {
+    let workspace = createDefaultWorkspace(
+      () => "2026-08-11T00:00:00.000Z",
+      sequentialIds(),
+    );
+    workspace = createProject(workspace, "随便聊聊", {
+      now: () => "2026-08-12T00:00:00.000Z",
+      createId: sequentialIds("p"),
+      agentType: "general",
+    });
+
+    const next = createSession(workspace, {
+      now: () => "2026-08-13T00:00:00.000Z",
+      createId: () => "session-extra",
+    });
+
+    expect(
+      next.sessions.find((s) => s.id === "session-extra")?.agentType,
+    ).toBe("general");
+  });
+
+  it("defaults new projects to weather when no type is given", () => {
+    const workspace = createDefaultWorkspace(
+      () => "2026-08-11T00:00:00.000Z",
+      sequentialIds(),
+    );
+
+    const next = createProject(workspace, "东京行程", {
+      now: () => "2026-08-12T00:00:00.000Z",
+      createId: sequentialIds("p"),
+    });
+
+    expect(next.projects[1]?.agentType).toBe("weather");
+    expect(
+      next.sessions.find((s) => s.id === next.activeSessionId)?.agentType,
+    ).toBe("weather");
+  });
+
+  it("keeps the session agent type when its project is deleted", () => {
+    let workspace = createDefaultWorkspace(
+      () => "2026-08-11T00:00:00.000Z",
+      sequentialIds(),
+    );
+    workspace = createProject(workspace, "随便聊聊", {
+      now: () => "2026-08-12T00:00:00.000Z",
+      createId: sequentialIds("p"),
+      agentType: "general",
+    });
+    const sessionId = workspace.activeSessionId;
+
+    const next = deleteProject(workspace, workspace.activeProjectId, {
+      now: () => "2026-08-13T00:00:00.000Z",
+      createId: () => "fresh-project",
+    });
+
+    const orphaned = next.sessions.find((s) => s.id === sessionId)!;
+    expect(orphaned.projectId).toBeNull();
+    expect(orphaned.agentType).toBe("general");
+  });
+});
+
+describe("workspace v1 migration", () => {
+  function v1Payload() {
+    return {
+      version: 1,
+      projects: [
+        {
+          id: "project-1",
+          name: "天气助手",
+          createdAt: "2026-08-11T00:00:00.000Z",
+          updatedAt: "2026-08-11T00:00:00.000Z",
+        },
+      ],
+      sessions: [
+        {
+          id: "session-1",
+          projectId: "project-1",
+          title: "东京三天行程",
+          messages: [{ id: "m1", role: "user", content: "东京天气怎么样？" }],
+          createdAt: "2026-08-11T00:00:00.000Z",
+          updatedAt: "2026-08-11T00:00:00.000Z",
+        },
+      ],
+      activeProjectId: "project-1",
+      activeSessionId: "session-1",
+    };
+  }
+
+  it("upgrades v1 data in place, stamping the weather agent type", () => {
+    const workspace = parseWorkspace(JSON.stringify(v1Payload()));
+
+    expect(workspace.version).toBe(2);
+    expect(workspace.projects[0]?.agentType).toBe("weather");
+    expect(workspace.sessions[0]?.agentType).toBe("weather");
+    expect(workspace.sessions[0]?.title).toBe("东京三天行程");
+    expect(workspace.sessions[0]?.messages).toHaveLength(1);
+    expect(workspace.activeProjectId).toBe("project-1");
+    expect(workspace.activeSessionId).toBe("session-1");
+  });
+
+  it("migrates v1 data from storage without recovery", () => {
+    const result = loadWorkspace({
+      getItem: () => JSON.stringify(v1Payload()),
+      setItem: () => undefined,
+    });
+
+    expect(result.recovered).toBe(false);
+    expect(result.workspace.version).toBe(2);
+    expect(result.workspace.projects[0]?.agentType).toBe("weather");
+  });
+
+  it("rejects data with an unknown agent type", () => {
+    const workspace = parseWorkspace(JSON.stringify(v1Payload()));
+    const tampered = {
+      ...workspace,
+      projects: [{ ...workspace.projects[0]!, agentType: "chat" }],
+    };
+
+    expect(() => parseWorkspace(JSON.stringify(tampered)))
+      .toThrow("Invalid workspace state");
+  });
+
+  it("still rejects unknown versions", () => {
+    expect(() => parseWorkspace(JSON.stringify({ version: 3 })))
+      .toThrow("Invalid workspace state");
+  });
+});

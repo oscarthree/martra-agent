@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { LibSQLStore } from "@mastra/libsql";
 import { Memory } from "@mastra/memory";
-import { SessionMemory } from "../src/mastra/agents/weather-agent";
+import { SessionMemory } from "../src/mastra/agents/shared";
 
 const storage = new LibSQLStore({
   id: "verify-memory",

@@ -1,54 +1,7 @@
 import { Agent } from '@mastra/core/agent';
-import { Memory } from '@mastra/memory';
-import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { weatherTool } from '../tools/weather-tool';
 import { weatherWorkflow } from '../workflows/weather-workflow';
-
-// Each workspace session runs as its own Mastra thread. A brand-new thread has
-// no row in storage yet, and @mastra/memory's recall() throws for unknown
-// threads instead of returning empty — which makes the AG-UI adapter log a
-// "Failed to compute new-message diff" warning on every session's first run.
-// Recall on a missing thread is legitimately empty, so soften just that case.
-export class SessionMemory extends Memory {
-  override async recall(
-    args: Parameters<Memory["recall"]>[0],
-  ): ReturnType<Memory["recall"]> {
-    try {
-      return await super.recall(args);
-    } catch (error) {
-      if (error instanceof Error && error.message.startsWith("No thread found")) {
-        return { messages: [], total: 0, page: 0, perPage: false, hasMore: false };
-      }
-      throw error;
-    }
-  }
-}
-
-
-// // 1. 创建 Kimi Provider
-// const kimi = createOpenAI({
-//   baseURL: 'https://api.moonshot.cn/v1',   // 或 https://api.moonshot.ai/v1
-//   apiKey: process.env.MOONSHOT_API_KEY,     // 从 platform.moonshot.cn 获取
-// });
-
-// // 2. 创建 Agent
-// export const kimiAgent = new Agent({
-//   name: 'KimiAgent',
-//   instructions: '你是一个 helpful assistant，用中文回答。',
-//   model: kimi('kimi-k2.6'),  // 或 kimi-k2.5, moonshot-v1-128k 等
-// });
-
-// // 3. 调用
-// async function main() {
-//   const result = await kimiAgent.generate('你好，请介绍一下自己');
-//   console.log(result.text);
-// }
-
-const kimi = createOpenAICompatible({
-  name: 'kimi-code',
-  baseURL: process.env.MOONSHOT_BASE_URL || 'https://api.moonshot.cn/v1',
-  apiKey: process.env.MOONSHOT_API_KEY,
-});
+import { kimi, SessionMemory } from './shared';
 
 export const weatherAgent = new Agent({
   id: 'weather-agent',
