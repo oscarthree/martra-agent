@@ -33,6 +33,11 @@ button { border: 0; cursor: pointer; color: inherit; background: none; }
   border-radius: 4px;
 }
 
+/* CopilotKit 输入框自带圆角容器，聚焦时不再叠加全局 focus ring */
+[data-copilotkit] textarea:focus-visible {
+  outline: none;
+}
+
 /* ---------- Layout ---------- */
 
 .workspace {
