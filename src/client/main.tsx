@@ -365,10 +365,19 @@ function WorkspaceChat({
     return () => subscription.unsubscribe();
   }, [agent, onSendErrorChange]);
 
+  // 每个会话首次进入时，无论快照是否为空都以快照为准：
+  // 新会话的 agent 克隆会继承共享 runtime agent 上的旧消息，必须显式清掉。
+  // 之后 agent 只可能比快照更新（流式增量），方向为 save-snapshot。
+  const hydratedSessions = useRef<Set<string>>(new Set());
+
   useEffect(() => {
+    if (!hydratedSessions.current.has(session.id)) {
+      hydratedSessions.current.add(session.id);
+      agent.setMessages(session.messages);
+      return;
+    }
     const sync = reconcileSessionMessages(agent.messages, session.messages);
     if (sync === "restore-snapshot") {
-      // 切换到有历史快照的会话：回填完整 Message Snapshot。
       agent.setMessages(session.messages);
     } else if (sync === "save-snapshot") {
       onMessagesChange(agent.messages);
