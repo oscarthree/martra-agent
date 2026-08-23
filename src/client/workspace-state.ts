@@ -34,6 +34,17 @@ export type WorkspaceState = {
 export const DEFAULT_PROJECT_NAME = "天气助手";
 export const DEFAULT_AGENT_TYPE: AgentType = "weather";
 
+// The client picks one runtime agent per session via these Mastra
+// registration keys (see the agents registry on the server side).
+const RUNTIME_AGENT_IDS: Record<AgentType, string> = {
+  weather: "weatherAgent",
+  general: "generalAgent",
+};
+
+export function runtimeAgentIdFor(agentType: AgentType): string {
+  return RUNTIME_AGENT_IDS[agentType];
+}
+
 export function createDefaultWorkspace(
   now: () => string = () => new Date().toISOString(),
   createId: () => string = () => crypto.randomUUID(),

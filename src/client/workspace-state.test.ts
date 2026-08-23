@@ -14,6 +14,7 @@ import {
   reconcileSessionMessages,
   renameProject,
   renameSession,
+  runtimeAgentIdFor,
   saveWorkspace,
   serializeWorkspace,
   setSessionMessages,
@@ -696,6 +697,13 @@ describe("agentType binding", () => {
     const orphaned = next.sessions.find((s) => s.id === sessionId)!;
     expect(orphaned.projectId).toBeNull();
     expect(orphaned.agentType).toBe("general");
+  });
+});
+
+describe("runtimeAgentIdFor", () => {
+  it("maps each agent type to its Mastra registration key", () => {
+    expect(runtimeAgentIdFor("weather")).toBe("weatherAgent");
+    expect(runtimeAgentIdFor("general")).toBe("generalAgent");
   });
 });
 

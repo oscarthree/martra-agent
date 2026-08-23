@@ -4,7 +4,7 @@
 
 **Blocked by:** None — can start immediately
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [ ] Project 与 Session 类型新增 `agentType` 字段；新建会话从当前活动项目捕获类型；新建项目可指定类型（默认 `weather`）
 - [ ] 删除项目后原项目会话进入未分类，`agentType` 保持创建时的值不变

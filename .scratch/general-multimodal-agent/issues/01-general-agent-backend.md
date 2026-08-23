@@ -4,7 +4,7 @@
 
 **Blocked by:** None — can start immediately
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [ ] 共享 provider 与 `SessionMemory` 被提取为单一来源，weather agent 改为复用它，且 `weatherAgent` 的指令、工具、工作流、记忆行为无任何变化
 - [ ] `generalAgent`（agent id `general-agent`）定义完成：中文指令、纯对话、无工具无工作流、模型不变（`kimi-k2.7-code`）、记忆使用共享 `SessionMemory`

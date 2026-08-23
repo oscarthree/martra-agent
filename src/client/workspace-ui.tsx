@@ -10,12 +10,14 @@ import {
   Plus,
   Trash2,
 } from "lucide-react";
-import type {
-  HistoryScope,
-  Project,
-  Session,
-  SessionHistoryGroups,
-  WorkspaceState,
+import {
+  DEFAULT_AGENT_TYPE,
+  type AgentType,
+  type HistoryScope,
+  type Project,
+  type Session,
+  type SessionHistoryGroups,
+  type WorkspaceState,
 } from "./workspace-state";
 
 const FOCUSABLE =
@@ -440,10 +442,11 @@ export function ProjectFormDialog({
   mode: "create" | "rename";
   initialName?: string;
   validate: (name: string) => string | null;
-  onSubmit: (name: string) => void;
+  onSubmit: (name: string, agentType: AgentType) => void;
   onClose: () => void;
 }) {
   const [name, setName] = useState(initialName);
+  const [agentType, setAgentType] = useState<AgentType>(DEFAULT_AGENT_TYPE);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -458,7 +461,7 @@ export function ProjectFormDialog({
       setError(problem);
       return;
     }
-    onSubmit(name.trim());
+    onSubmit(name.trim(), agentType);
     onClose();
   };
 
@@ -482,6 +485,35 @@ export function ProjectFormDialog({
       <div className="field-error" role="alert" title={error ?? undefined}>
         {error ?? ""}
       </div>
+      {mode === "create" && (
+        <fieldset className="agent-type-field">
+          <legend>助手类型（创建后不可修改）</legend>
+          <label className="agent-type-option">
+            <input
+              type="radio"
+              name="agent-type"
+              checked={agentType === "weather"}
+              onChange={() => setAgentType("weather")}
+            />
+            <span>
+              天气助手
+              <span className="agent-type-hint">查天气、规划活动和行程</span>
+            </span>
+          </label>
+          <label className="agent-type-option">
+            <input
+              type="radio"
+              name="agent-type"
+              checked={agentType === "general"}
+              onChange={() => setAgentType("general")}
+            />
+            <span>
+              通用助手
+              <span className="agent-type-hint">日常问答与闲聊</span>
+            </span>
+          </label>
+        </fieldset>
+      )}
       <div className="modal-actions">
         <button type="button" onClick={onClose}>
           取消

@@ -425,6 +425,48 @@ button { border: 0; cursor: pointer; color: inherit; background: none; }
 .modal-actions .primary:hover { background: var(--wc-accent-hover); }
 .modal-actions .primary.danger { background: var(--wc-error); }
 
+.agent-type-field {
+  margin: 4px 0 0;
+  padding: 0;
+  border: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.agent-type-field legend {
+  padding: 0;
+  margin-bottom: 2px;
+  color: var(--wc-muted);
+  font-size: 12px;
+}
+.agent-type-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--wc-line);
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.agent-type-option:has(input:checked) {
+  border-color: var(--wc-accent);
+  background: var(--wc-soft);
+}
+.modal .agent-type-option input[type="radio"] {
+  width: auto;
+  margin-top: 3px;
+  padding: 0;
+  border: none;
+  accent-color: var(--wc-accent);
+}
+.agent-type-hint {
+  display: block;
+  color: var(--wc-muted);
+  font-size: 12px;
+  margin-top: 2px;
+}
+
 .workspace-notice {
   position: fixed;
   bottom: 24px;

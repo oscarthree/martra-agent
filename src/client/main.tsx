@@ -21,11 +21,13 @@ import {
   reconcileSessionMessages,
   renameProject,
   renameSession,
+  runtimeAgentIdFor,
   saveWorkspace,
   setSessionMessages,
   switchProject,
   switchSession,
   validateProjectName,
+  type AgentType,
   type HistoryScope,
   type Project,
   type Session,
@@ -142,12 +144,15 @@ function App() {
     closeDrawer();
   }, [closeDrawer]);
 
-  const handleCreateProject = (name: string) => {
+  const handleCreateProject = (name: string, agentType: AgentType) => {
     // 预生成 id：StrictMode 会重复执行 updater，id 必须保持确定
     const ids = [crypto.randomUUID(), crypto.randomUUID()];
     let call = 0;
     setWorkspace((current) =>
-      createProject(current, name, { createId: () => ids[call++ % 2]! }),
+      createProject(current, name, {
+        createId: () => ids[call++ % 2]!,
+        agentType,
+      }),
     );
     setHistoryScope({ kind: "project", projectId: ids[0]! });
   };
@@ -314,25 +319,60 @@ function App() {
   );
 }
 
-function Welcome({ onPick }: { onPick: (text: string) => void }) {
+type WelcomeContent = {
+  kicker: string;
+  title: string;
+  copy: string;
+  suggestions: Array<{ label: string; prompt: string }>;
+};
+
+// 空状态文案按会话的 agent 类型区分：天气项目保留天气推荐问题，
+// 通用助手项目显示通用欢迎语、不含天气推荐。
+const WELCOME_CONTENT: Record<AgentType, WelcomeContent> = {
+  weather: {
+    kicker: "LIVE WEATHER ASSISTANT",
+    title: "今天想去哪里？",
+    copy: "告诉我一个城市、天气问题，或者你的下一段旅程。我会结合实时天气，帮你把一天安排得更从容。",
+    suggestions: [
+      { label: "北京周末天气", prompt: "北京周末天气怎么样？" },
+      { label: "大连三天行程", prompt: "帮我安排大连三天行程" },
+      { label: "东京出行建议", prompt: "东京今天适合带什么？" },
+    ],
+  },
+  general: {
+    kicker: "GENERAL ASSISTANT",
+    title: "有什么可以帮你？",
+    copy: "日常问答、闲聊、写作、翻译都可以。直接输入你的问题，我们开始。",
+    suggestions: [],
+  },
+};
+
+function Welcome({
+  content,
+  onPick,
+}: {
+  content: WelcomeContent;
+  onPick: (text: string) => void;
+}) {
   return (
     <div className="welcome">
-      <div className="welcome-kicker">LIVE WEATHER ASSISTANT</div>
-      <h1>今天想去哪里？</h1>
-      <p className="welcome-copy">
-        告诉我一个城市、天气问题，或者你的下一段旅程。我会结合实时天气，帮你把一天安排得更从容。
-      </p>
-      <div className="suggestions" aria-label="推荐问题">
-        <button type="button" className="suggestion" onClick={() => onPick("北京周末天气怎么样？")}>
-          北京周末天气
-        </button>
-        <button type="button" className="suggestion" onClick={() => onPick("帮我安排大连三天行程")}>
-          大连三天行程
-        </button>
-        <button type="button" className="suggestion" onClick={() => onPick("东京今天适合带什么？")}>
-          东京出行建议
-        </button>
-      </div>
+      <div className="welcome-kicker">{content.kicker}</div>
+      <h1>{content.title}</h1>
+      <p className="welcome-copy">{content.copy}</p>
+      {content.suggestions.length > 0 && (
+        <div className="suggestions" aria-label="推荐问题">
+          {content.suggestions.map((suggestion) => (
+            <button
+              key={suggestion.label}
+              type="button"
+              className="suggestion"
+              onClick={() => onPick(suggestion.prompt)}
+            >
+              {suggestion.label}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -350,7 +390,7 @@ function WorkspaceChat({
 }) {
   const { agent } = useAgent({
     agentId: `workspace-session-${session.id}`,
-    runtimeAgentId: "weatherAgent",
+    runtimeAgentId: runtimeAgentIdFor(session.agentType),
     threadId: session.id,
     updates: [UseAgentUpdate.OnMessagesChanged, UseAgentUpdate.OnRunStatusChanged],
   });
@@ -414,7 +454,10 @@ function WorkspaceChat({
         <>
           <div className="chat-scroll">
             {agent.messages.length === 0 ? (
-              <Welcome onPick={setInputValue} />
+              <Welcome
+                content={WELCOME_CONTENT[session.agentType]}
+                onPick={setInputValue}
+              />
             ) : (
               scrollView
             )}
