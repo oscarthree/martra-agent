@@ -6,9 +6,9 @@
 
 **Status:** done
 
-- [ ] 共享 provider 与 `SessionMemory` 被提取为单一来源，weather agent 改为复用它，且 `weatherAgent` 的指令、工具、工作流、记忆行为无任何变化
-- [ ] `generalAgent`（agent id `general-agent`）定义完成：中文指令、纯对话、无工具无工作流、模型不变（`kimi-k2.7-code`）、记忆使用共享 `SessionMemory`
-- [ ] `generalAgent` 注册进 Mastra 实例的 agents map（键名 `generalAgent`），Express 入口与 `/api/copilotkit` 路由零改动即可通过 `MastraAgent.getLocalAgents` 暴露
-- [ ] 新增 agent 定义形态单测：注册键正确、无工具/工作流配置、记忆为共享 `SessionMemory`；不发起任何网络或模型调用
-- [ ] `pnpm test` 与 `pnpm exec tsc --noEmit` 通过
-- [ ] 实现前已按项目 AGENTS.md 要求加载 `mastra` skill（远端不可用则核对 node_modules 类型定义）
+- [x] 共享 provider 与 `SessionMemory` 被提取为单一来源，weather agent 改为复用它，且 `weatherAgent` 的指令、工具、工作流、记忆行为无任何变化
+- [x] `generalAgent`（agent id `general-agent`）定义完成：中文指令、纯对话、无工具无工作流、模型不变（`kimi-k2.7-code`）、记忆使用共享 `SessionMemory`
+- [x] `generalAgent` 注册进 Mastra 实例的 agents map（键名 `generalAgent`），Express 入口与 `/api/copilotkit` 路由零改动即可通过 `MastraAgent.getLocalAgents` 暴露
+- [x] 新增 agent 定义形态单测：注册键正确、无工具/工作流配置、记忆为共享 `SessionMemory`；不发起任何网络或模型调用
+- [x] `pnpm test` 与 `pnpm exec tsc --noEmit` 通过
+- [x] 实现前已按项目 AGENTS.md 要求加载 `mastra` skill（远端不可用则核对 node_modules 类型定义）

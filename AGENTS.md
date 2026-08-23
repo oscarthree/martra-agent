@@ -132,7 +132,7 @@ src/
 ## 测试
 
 - 使用 Vitest，运行 `pnpm test`
-- 测试文件与源码同目录，命名为 `*.test.ts`（当前 3 个测试文件、64 个用例）
+- 测试文件与源码同目录，命名为 `*.test.ts`（当前 3 个测试文件、71 个用例）
 - 现有测试覆盖 zod schema 校验（工作流输入）和纯状态逻辑（workspace-state 的序列化/恢复/分组）；网络与模型调用不做集成测试
 - 提交前建议运行 `pnpm test` 和 `pnpm exec tsc --noEmit`
 

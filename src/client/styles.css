@@ -467,6 +467,21 @@ button { border: 0; cursor: pointer; color: inherit; background: none; }
   margin-top: 2px;
 }
 
+.chat-body { display: contents; }
+.drop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  border: 2px dashed var(--wc-accent);
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--wc-accent);
+  font-size: 14px;
+}
+
 .workspace-notice {
   position: fixed;
   bottom: 24px;

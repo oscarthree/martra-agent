@@ -1,10 +1,12 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
+  CopilotChatAttachmentQueue,
   CopilotChatView,
   CopilotKit,
   UseAgentUpdate,
   useAgent,
+  useAttachments,
   useCopilotKit,
 } from "@copilotkit/react-core/v2";
 import type { Message } from "@ag-ui/core";
@@ -347,6 +349,9 @@ const WELCOME_CONTENT: Record<AgentType, WelcomeContent> = {
   },
 };
 
+// 附件只接受图片；useAttachments 配置与隐藏 file input 共用同一来源。
+const ATTACHMENT_ACCEPT = "image/*";
+
 function Welcome({
   content,
   onPick,
@@ -397,6 +402,30 @@ function WorkspaceChat({
   const { copilotkit } = useCopilotKit();
   const [inputValue, setInputValue] = useState("");
 
+  // 附件仅对通用助手会话开放；天气会话没有任何附件入口。
+  // 受控 CopilotChatView 的 children 分支不会自动渲染附件队列，
+  // 需要手动组合队列、隐藏 file input 和拖拽/粘贴 handler。
+  const attachmentsEnabled = session.agentType === "general";
+  const {
+    attachments,
+    dragOver,
+    fileInputRef,
+    containerRef,
+    handleFileUpload,
+    handleDragOver,
+    handleDragLeave,
+    handleDrop,
+    removeAttachment,
+    consumeAttachments,
+  } = useAttachments({
+    config: {
+      enabled: attachmentsEnabled,
+      accept: ATTACHMENT_ACCEPT,
+      onUploadFailed: ({ message }) =>
+        onSendErrorChange(`图片上传失败：${message}`),
+    },
+  });
+
   // runAgent 失败不会 reject：错误经 agent 订阅的 onRunFailed 上报
   useEffect(() => {
     const subscription = agent.subscribe({
@@ -440,18 +469,50 @@ function WorkspaceChat({
       welcomeScreen={false}
       inputValue={inputValue}
       onInputChange={setInputValue}
+      onAddFile={
+        attachmentsEnabled ? () => fileInputRef.current?.click() : undefined
+      }
       onSubmitMessage={async (text) => {
-        agent.addMessage({
-          id: crypto.randomUUID(),
-          role: "user",
-          content: text,
-        });
+        // 附件仍在上传时拒绝发送，与 CopilotChat 内部 guard 一致；
+        // 输入文本和附件都保留，用户可在上传完成后重发
+        if (attachments.some((attachment) => attachment.status === "uploading")) {
+          return;
+        }
+        const readyAttachments = attachmentsEnabled ? consumeAttachments() : [];
+        if (readyAttachments.length === 0) {
+          agent.addMessage({
+            id: crypto.randomUUID(),
+            role: "user",
+            content: text,
+          });
+        } else {
+          agent.addMessage({
+            id: crypto.randomUUID(),
+            role: "user",
+            content: [
+              ...(text.trim() ? [{ type: "text" as const, text }] : []),
+              ...readyAttachments.map((attachment) => ({
+                type: attachment.type,
+                source: attachment.source,
+                ...(attachment.filename
+                  ? { metadata: { filename: attachment.filename } }
+                  : {}),
+              })),
+            ],
+          });
+        }
         setInputValue("");
         await runAgent();
       }}
     >
       {({ scrollView, input }) => (
-        <>
+        <div
+          ref={containerRef}
+          className="chat-body"
+          onDragOver={attachmentsEnabled ? handleDragOver : undefined}
+          onDragLeave={attachmentsEnabled ? handleDragLeave : undefined}
+          onDrop={attachmentsEnabled ? handleDrop : undefined}
+        >
           <div className="chat-scroll">
             {agent.messages.length === 0 ? (
               <Welcome
@@ -479,8 +540,27 @@ function WorkspaceChat({
               </span>
             </div>
           )}
+          {attachmentsEnabled && (
+            <CopilotChatAttachmentQueue
+              attachments={attachments}
+              onRemoveAttachment={removeAttachment}
+            />
+          )}
           {input}
-        </>
+          {attachmentsEnabled && (
+            <input
+              type="file"
+              accept={ATTACHMENT_ACCEPT}
+              multiple
+              hidden
+              ref={fileInputRef}
+              onChange={handleFileUpload}
+            />
+          )}
+          {attachmentsEnabled && dragOver && (
+            <div className="drop-overlay">松开以上传图片</div>
+          )}
+        </div>
       )}
     </CopilotChatView>
   );

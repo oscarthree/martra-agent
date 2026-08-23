@@ -188,6 +188,31 @@ export function saveWorkspace(
 export const DEFAULT_SESSION_TITLE = "新会话";
 export const SESSION_TITLE_MAX_LENGTH = 24;
 
+// Image attachments are kept out of localStorage: the base64 payload would
+// blow the quota after a few photos. Snapshots store a text placeholder
+// instead, so restored history shows where an image was. The placeholder is
+// plain text, which means it goes back to the model as ordinary text if the
+// conversation continues after a reload — accepted behavior.
+export const IMAGE_PLACEHOLDER_TEXT = "[图片未保存到本地]";
+
+export function sanitizeMessagesForStorage(messages: Message[]): Message[] {
+  return messages.map((message) => {
+    // 只有用户消息会携带附件 content part；其他角色的 content 是字符串。
+    if (message.role !== "user") return message;
+    if (!Array.isArray(message.content)) return message;
+    if (!message.content.some((part) => part.type !== "text")) return message;
+
+    return {
+      ...message,
+      content: message.content.map((part) =>
+        part.type === "text"
+          ? part
+          : { type: "text" as const, text: IMAGE_PLACEHOLDER_TEXT },
+      ),
+    };
+  });
+}
+
 export function deriveSessionTitle(content: string): string {
   return [...content.replace(/[\r\n]/g, "")].slice(0, SESSION_TITLE_MAX_LENGTH).join("");
 }
@@ -198,7 +223,10 @@ export function reconcileSessionMessages(
   agentMessages: Message[],
   sessionMessages: Message[],
 ): SessionMessageSync {
-  if (JSON.stringify(agentMessages) === JSON.stringify(sessionMessages)) {
+  // 快照中的图片已降级为占位符，比较前先对 agent 侧做同样的净化，
+  // 否则带图会话会永远判定为 save-snapshot，造成保存-渲染循环。
+  const sanitizedAgentMessages = sanitizeMessagesForStorage(agentMessages);
+  if (JSON.stringify(sanitizedAgentMessages) === JSON.stringify(sessionMessages)) {
     return "in-sync";
   }
 
@@ -286,6 +314,7 @@ export function setSessionMessages(
   const now = resolveNow(options);
   const timestamp = now();
   const firstUserMessage = messages.find((message) => message.role === "user");
+  const storedMessages = sanitizeMessagesForStorage(messages);
 
   return {
     ...workspace,
@@ -300,7 +329,7 @@ export function setSessionMessages(
           ? derivedTitle
           : session.title;
 
-      return { ...session, title, messages, updatedAt: timestamp };
+      return { ...session, title, messages: storedMessages, updatedAt: timestamp };
     }),
   };
 }
@@ -477,7 +506,12 @@ export function deleteSession(
 }
 
 function messageText(message: Message): string {
-  return typeof message.content === "string" ? message.content : "";
+  if (typeof message.content === "string") return message.content;
+  if (!Array.isArray(message.content)) return "";
+  return message.content
+    .filter((part) => part.type === "text")
+    .map((part) => part.text)
+    .join("");
 }
 
 export type HistoryScope =

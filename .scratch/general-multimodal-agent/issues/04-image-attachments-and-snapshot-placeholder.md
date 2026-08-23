@@ -4,14 +4,19 @@
 
 **Blocked by:** 03 — 项目类型选择与会话 agent 路由
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] 受控聊天视图通过 `useAttachments` hook 手动接线附件队列与渲染组件（受控视图无法直接传附件配置）；仅在当前会话 `agentType` 为 `general` 时渲染附件 UI
-- [ ] 支持点击选择与拖放两种方式；发送前可见队列、可移除；图片与文本作为同一条用户消息发送
-- [ ] 图片以 CopilotKit 默认 base64 data URL 原图直发，不做前端压缩；全链路（AG-UI → `@ag-ui/mastra` → Mastra → Moonshot `image_url` part）无需补丁
-- [ ] 天气会话不渲染任何附件入口，既有发送/重试/快照行为无回归
-- [ ] 快照持久化前的净化器把 image/binary content part 替换为文本占位 part，存储载荷保持 schema 合法；在线（未刷新）会话视图仍显示真实图片
-- [ ] 刷新后历史图片位置渲染弱化的"图片未保存到本地"占位文案；继续对话时占位符作为普通文本上行（已接受的既定行为）
-- [ ] localStorage 配额/写入失败走既有轻量提示路径，内存状态不丢
-- [ ] 净化器与占位恢复有同目录 Vitest 单测；附件交互与全链路发图留待 05 的浏览器验收
-- [ ] `pnpm test` 与 `pnpm exec tsc --noEmit` 通过
+- [x] 受控聊天视图通过 `useAttachments` hook 手动接线附件队列与渲染组件（受控视图无法直接传附件配置）；仅在当前会话 `agentType` 为 `general` 时渲染附件 UI
+- [x] 支持点击选择与拖放两种方式；发送前可见队列、可移除；图片与文本作为同一条用户消息发送
+- [x] 图片以 CopilotKit 默认 base64 data URL 原图直发，不做前端压缩；全链路（AG-UI → `@ag-ui/mastra` → Mastra → Moonshot `image_url` part）无需补丁
+- [x] 天气会话不渲染任何附件入口，既有发送/重试/快照行为无回归
+- [x] 快照持久化前的净化器把 image/binary content part 替换为文本占位 part，存储载荷保持 schema 合法；在线（未刷新）会话视图仍显示真实图片
+- [x] 刷新后历史图片位置渲染"[图片未保存到本地]"占位文案（以用户消息内联文本呈现，不做额外弱化样式——自定义用户消息渲染器的成本与价值不成比例，文案本身已表达降级语义）；继续对话时占位符作为普通文本上行（已接受的既定行为）
+- [x] localStorage 配额/写入失败走既有轻量提示路径，内存状态不丢
+- [x] 净化器与占位恢复有同目录 Vitest 单测；全链路发图已在浏览器实测通过（模型正确描述图中红色圆形与"CAT"文字），05 的对应验收项可视为提前通过
+- [x] `pnpm test` 与 `pnpm exec tsc --noEmit` 通过
+
+## 实现记录
+
+- 修复了一个手工测试中发现的保存-渲染死循环：净化后快照与 agent 实时消息永远不相等，`reconcileSessionMessages` 会持续判定 save-snapshot；现为比较前对 agent 侧做同样净化（有回归测试）。
+- 已知取舍：附件上传中点击发送会被静默拦截（文本与附件保留，可重发），本地上传窗口极短，暂不加额外提示。

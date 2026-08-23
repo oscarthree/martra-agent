@@ -15,6 +15,8 @@ import {
   renameProject,
   renameSession,
   runtimeAgentIdFor,
+  IMAGE_PLACEHOLDER_TEXT,
+  sanitizeMessagesForStorage,
   saveWorkspace,
   serializeWorkspace,
   setSessionMessages,
@@ -216,6 +218,49 @@ describe("setSessionMessages", () => {
     expect(next.sessions[0]!.title).toBe("广州周末适合去哪儿玩？");
   });
 
+  it("derives the title from the text part of a message with attachments", () => {
+    const workspace = base();
+
+    const next = setSessionMessages(workspace, workspace.activeSessionId, [
+      {
+        id: "m1",
+        role: "user" as const,
+        content: [
+          { type: "text" as const, text: "这张图片里是什么？" },
+          {
+            type: "image" as const,
+            source: { type: "data" as const, value: "aGVsbG8=", mimeType: "image/png" },
+          },
+        ],
+      },
+    ]);
+
+    expect(next.sessions[0]!.title).toBe("这张图片里是什么？");
+  });
+
+  it("sanitizes image parts before storing the snapshot", () => {
+    const workspace = base();
+
+    const next = setSessionMessages(workspace, workspace.activeSessionId, [
+      {
+        id: "m1",
+        role: "user" as const,
+        content: [
+          { type: "text" as const, text: "看图" },
+          {
+            type: "image" as const,
+            source: { type: "data" as const, value: "aGVsbG8=", mimeType: "image/png" },
+          },
+        ],
+      },
+    ]);
+
+    expect(next.sessions[0]!.messages[0]?.content).toEqual([
+      { type: "text", text: "看图" },
+      { type: "text", text: IMAGE_PLACEHOLDER_TEXT },
+    ]);
+  });
+
   it("does not override a manually renamed title", () => {
     const workspace = base();
     const renamed = renameSession(workspace, workspace.activeSessionId, "我的行程");
@@ -387,6 +432,30 @@ describe("reconcileSessionMessages", () => {
 
   it("saves the snapshot when the agent has newer messages", () => {
     expect(reconcileSessionMessages([userMessage], [])).toBe("save-snapshot");
+  });
+
+  it("stays in sync when the agent holds the live image and the session holds the placeholder", () => {
+    const live = {
+      id: "m1",
+      role: "user" as const,
+      content: [
+        { type: "text" as const, text: "看图" },
+        {
+          type: "image" as const,
+          source: { type: "data" as const, value: "aGVsbG8=", mimeType: "image/png" },
+        },
+      ],
+    };
+    const stored = {
+      id: "m1",
+      role: "user" as const,
+      content: [
+        { type: "text" as const, text: "看图" },
+        { type: "text" as const, text: IMAGE_PLACEHOLDER_TEXT },
+      ],
+    };
+
+    expect(reconcileSessionMessages([live], [stored])).toBe("in-sync");
   });
 
   it("stays in sync when both sides hold the same messages", () => {
@@ -697,6 +766,63 @@ describe("agentType binding", () => {
     const orphaned = next.sessions.find((s) => s.id === sessionId)!;
     expect(orphaned.projectId).toBeNull();
     expect(orphaned.agentType).toBe("general");
+  });
+});
+
+describe("sanitizeMessagesForStorage", () => {
+  const imagePart = {
+    type: "image",
+    source: { type: "data", value: "aGVsbG8=", mimeType: "image/png" },
+  } as const;
+
+  it("replaces image parts with a text placeholder and keeps text parts", () => {
+    const messages = [
+      {
+        id: "m1",
+        role: "user" as const,
+        content: [{ type: "text" as const, text: "看图说话" }, imagePart],
+      },
+    ];
+
+    const sanitized = sanitizeMessagesForStorage(messages);
+
+    expect(sanitized[0]?.content).toEqual([
+      { type: "text", text: "看图说话" },
+      { type: "text", text: IMAGE_PLACEHOLDER_TEXT },
+    ]);
+    expect(messages[0]?.content).toHaveLength(2); // 原消息不被改写
+    expect(
+      (messages[0]?.content as unknown[])[1],
+    ).toEqual(imagePart);
+  });
+
+  it("keeps string content and text-only messages untouched", () => {
+    const messages = [
+      { id: "m1", role: "user" as const, content: "纯文本" },
+      {
+        id: "m2",
+        role: "user" as const,
+        content: [{ type: "text" as const, text: "仅文本 part" }],
+      },
+    ];
+
+    expect(sanitizeMessagesForStorage(messages)).toEqual(messages);
+  });
+
+  it("produces schema-valid messages that survive a workspace round trip", () => {
+    const workspace = createDefaultWorkspace(
+      () => "2026-08-11T00:00:00.000Z",
+      sequentialIds(),
+    );
+    const withImage = setSessionMessages(workspace, workspace.activeSessionId, [
+      { id: "m1", role: "user" as const, content: [imagePart] },
+    ]);
+
+    const restored = parseWorkspace(serializeWorkspace(withImage));
+
+    expect(restored.sessions[0]?.messages[0]?.content).toEqual([
+      { type: "text", text: IMAGE_PLACEHOLDER_TEXT },
+    ]);
   });
 });
 
