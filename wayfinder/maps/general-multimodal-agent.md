@@ -28,11 +28,18 @@
 
 ## Implementation tickets
 
-- [01 — 后端并列注册通用助手 agent](../../.scratch/general-multimodal-agent/issues/01-general-agent-backend.md) — 无阻塞，可立即开始。
-- [02 — 工作区状态 v2：项目/会话类型与原地迁移](../../.scratch/general-multimodal-agent/issues/02-workspace-state-v2-agent-type.md) — 无阻塞，可立即开始。
-- [03 — 项目类型选择与会话 agent 路由](../../.scratch/general-multimodal-agent/issues/03-project-type-selection-and-agent-routing.md) — 阻塞于 01、02。
-- [04 — 通用会话的图片附件与快照占位降级](../../.scratch/general-multimodal-agent/issues/04-image-attachments-and-snapshot-placeholder.md) — 阻塞于 03。
-- [05 — 端到端验收与文档同步](../../.scratch/general-multimodal-agent/issues/05-e2e-acceptance-and-docs.md) — 阻塞于 04。
+- [01 — 后端并列注册通用助手 agent](../../.scratch/general-multimodal-agent/issues/01-general-agent-backend.md) — done。
+- [02 — 工作区状态 v2：项目/会话类型与原地迁移](../../.scratch/general-multimodal-agent/issues/02-workspace-state-v2-agent-type.md) — done。
+- [03 — 项目类型选择与会话 agent 路由](../../.scratch/general-multimodal-agent/issues/03-project-type-selection-and-agent-routing.md) — done。
+- [04 — 通用会话的图片附件与快照占位降级](../../.scratch/general-multimodal-agent/issues/04-image-attachments-and-snapshot-placeholder.md) — done。
+- [05 — 端到端验收与文档同步](../../.scratch/general-multimodal-agent/issues/05-e2e-acceptance-and-docs.md) — done。
+
+## 实现阶段补充决策
+
+- 占位符渲染：图片快照占位以内联纯文本"[图片未保存到本地]"呈现，不做自定义消息渲染器（成本与价值不成比例）。
+- 发现并已修复：净化快照与 agent 实时消息永远不相等会导致保存-渲染死循环；`reconcileSessionMessages` 比较前对 agent 侧做同样净化（有回归测试）。
+- 附件只接受图片（`image/*`），上传中点击发送静默拦截（文本与附件保留，可重发）。
+- 全链路验收已在浏览器实测通过：模型正确描述测试图片内容；v1 数据原地迁移、多轮追问、刷新占位、天气会话回归全部通过。
 
 ## Not yet specified
 

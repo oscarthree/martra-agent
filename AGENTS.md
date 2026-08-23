@@ -18,7 +18,7 @@
 
 模型能力由 Moonshot 的 OpenAI 兼容接口提供（模型名硬编码为 `kimi-k2.7-code`，见 `src/mastra/agents/`）。前端是 React 19 + CopilotKit Chat（v2 API），后端通过 Mastra 管理 Agent、Tool、Workflow、Memory 和存储。
 
-前端在工作区（Workspace）模型上组织聊天：项目（Project）包含多个会话（Session），每个会话对应一个 Mastra 线程（`threadId = session.id`）。领域术语定义见 `CONTEXT.md`。
+前端在工作区（Workspace）模型上组织聊天：项目（Project）包含多个会话（Session），每个会话对应一个 Mastra 线程（`threadId = session.id`）。项目带有创建时选定、不可修改的助手类型（天气助手 / 通用助手），会话创建时捕获该类型并据此路由到对应 agent。领域术语定义见 `CONTEXT.md`。
 
 ### 运行时架构
 
@@ -32,16 +32,17 @@ CopilotKit Runtime v2 (Express :3000)
     v
 AG-UI Mastra Adapter (@ag-ui/mastra)
     |
-    v
-weatherAgent
-    |-- 普通当前天气查询 -> weatherTool -> Open-Meteo
+    |-- weatherAgent（weather 类型会话）
+    |       |-- 普通当前天气查询 -> weatherTool -> Open-Meteo
+    |       |
+    |       `-- 活动/行程请求 -> weatherWorkflow
+    |                           |-- 地理编码和多日天气预报 -> Open-Meteo
+    |                           `-- activityPlannerAgent -> 模板化活动规划
     |
-    `-- 活动/行程请求 -> weatherWorkflow
-                            |-- 地理编码和多日天气预报 -> Open-Meteo
-                            `-- activityPlannerAgent -> 模板化活动规划
+    `-- generalAgent（general 类型会话）：纯对话 + 图片理解（base64），无工具
 ```
 
-意图识别由 `weatherAgent` 根据指令自行选择工具：普通当前天气查询走 `weatherTool`，活动/行程/旅游/攻略/计划类请求走 `weatherWorkflow`（输入为 `{ city: string; days: number }`，days 为 1 到 7，默认 1）。
+意图识别由 `weatherAgent` 根据指令自行选择工具：普通当前天气查询走 `weatherTool`，活动/行程/旅游/攻略/计划类请求走 `weatherWorkflow`（输入为 `{ city: string; days: number }`，days 为 1 到 7，默认 1）。`generalAgent` 不做意图路由，直接对话。
 
 ## 技术栈
 
@@ -125,8 +126,9 @@ src/
 
 ## 工作区前端要点
 
-- 工作区状态是纯函数模型（`workspace-state.ts`），通过 `localStorage` 键 `weather-copilot-workspace-v1` 持久化；加载失败会重置为默认工作区并提示
-- 每个会话在 `useAgent` 中以 `agentId: workspace-session-<session.id>`、`threadId: session.id` 运行；首次进入会话时必须以本地快照覆盖 agent 消息（`hydratedSessions` 逻辑），之后用 `reconcileSessionMessages` 决定同步方向
+- 工作区状态是纯函数模型（`workspace-state.ts`），通过 `localStorage` 键 `weather-copilot-workspace-v1` 持久化；加载失败会重置为默认工作区并提示。当前状态版本为 v2：Project 和 Session 带 `agentType`，v1 数据加载时原地迁移（全部补 `weather`）
+- 每个会话在 `useAgent` 中以 `agentId: workspace-session-<session.id>`、`threadId: session.id` 运行，`runtimeAgentId` 由会话的 `agentType` 经 `runtimeAgentIdFor` 推导（`weatherAgent` / `generalAgent`）；首次进入会话时必须以本地快照覆盖 agent 消息（`hydratedSessions` 逻辑），之后用 `reconcileSessionMessages` 决定同步方向
+- 附件仅对 `general` 会话开放：受控视图用 `useAttachments` 手动接线队列与拖拽；持久化前 `sanitizeMessagesForStorage` 把图片 part 降级为文本占位符（`reconcileSessionMessages` 比较前会对 agent 侧做同样净化，否则会陷入保存-渲染循环）
 - 浏览器端通过 `localStorage` 持久化 `mastra-resource-id`，请求时放入 `x-mastra-resource-id` 头，后端从该头读取（缺省为 `"default"`），用于关联 Mastra Memory 的服务端记忆（即 CONTEXT.md 中的 Resource Identity）
 
 ## 测试

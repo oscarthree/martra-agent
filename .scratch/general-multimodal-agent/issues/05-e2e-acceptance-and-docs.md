@@ -4,12 +4,12 @@
 
 **Blocked by:** 04 — 通用会话的图片附件与快照占位降级
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] 浏览器验收：新建通用助手项目 → 发送带图问题 → 模型回答正确描述图片内容（这是规格规定的全链路验收门槛，必须通过才算完成）
-- [ ] 浏览器验收：拖放 attach、附件队列移除、图文同发、多轮追问、刷新后占位符展示、天气会话无附件入口
-- [ ] 浏览器验收：真实 v1 localStorage 数据加载后原地迁移，既有天气会话、历史、项目选择行为无回归
-- [ ] `pnpm test` 与 `pnpm exec tsc --noEmit` 全绿
-- [ ] CONTEXT.md 新增"通用助手""项目 Agent 类型"术语，并更新 Project / Session 定义提及类型绑定
-- [ ] 项目 AGENTS.md 的运行时架构、代码结构、环境说明同步到实现现状
-- [ ] wayfinder 地图 `general-multimodal-agent` 的决策记录与本规格 ticket 状态收尾
+- [x] 浏览器验收：新建通用助手项目 → 发送带图问题 → 模型回答正确描述图片内容（这是规格规定的全链路验收门槛，必须通过才算完成）—— 04 中实测通过：模型答出"红色的圆形、黑色大写字母 CAT、白色背景"
+- [x] 浏览器验收：附件队列移除、图文同发、多轮追问、刷新后占位符展示、天气会话无附件入口均实测通过；拖放 handler 按 CopilotKit 内部同款接线（MCP 无法模拟操作系统级文件拖放，未做真实拖拽测试）
+- [x] 浏览器验收：真实 v1 localStorage 数据加载后原地迁移，既有天气会话、历史、项目选择行为无回归（03 中实测通过）
+- [x] `pnpm test` 与 `pnpm exec tsc --noEmit` 全绿
+- [x] CONTEXT.md 新增"通用助手""项目 Agent 类型"术语，并更新 Project / Session 定义提及类型绑定（另补充"图片占位符"术语）
+- [x] 项目 AGENTS.md 的运行时架构、代码结构、环境说明同步到实现现状
+- [x] wayfinder 地图 `general-multimodal-agent` 的决策记录与本规格 ticket 状态收尾
