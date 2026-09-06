@@ -46,7 +46,11 @@
 
 ## General Assistant
 
-通用助手（`generalAgent`）：纯对话的助手类型，支持文本闲聊和图片理解（输入侧多模态），不带任何工具。与天气助手并列存在，通过 Project Agent Type 绑定到项目。
+通用助手（`generalAgent`）：以对话为主的助手类型，支持文本闲聊和图片理解（输入侧多模态），并能通过 Web Page Fetch 抓取用户给出的具体网页；不承担天气意图路由。与天气助手并列存在，通过 Project Agent Type 绑定到项目。
+
+## Web Page Fetch
+
+网页抓取：通用助手的工具能力。用户给出具体网址时，助手调用 `webOpenUrl` 抓取公开网页的原始 HTML 并围绕内容回答；遇到 JS 动态渲染或反爬挑战页（如豆瓣 sec.douban.com 安全校验）时改用 `webOpenUrlRendered`（无头浏览器）。助手没有主动联网搜索能力，只能打开用户给出的 URL；抓取失败（403/超时/登录/验证码/非 HTML 文件）时如实说明，不编造页面内容。
 
 ## Image Placeholder
 

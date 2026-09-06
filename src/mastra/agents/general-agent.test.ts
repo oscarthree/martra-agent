@@ -13,8 +13,11 @@ describe('generalAgent definition', () => {
     expect(agents.generalAgent).toBe(generalAgent);
   });
 
-  it('has no tools or workflows configured', async () => {
-    expect(Object.keys(await generalAgent.listTools())).toEqual([]);
+  it('exposes the web page tools and no workflows', async () => {
+    expect(Object.keys(await generalAgent.listTools())).toEqual([
+      'webOpenUrl',
+      'webOpenUrlRendered',
+    ]);
     expect(Object.keys(await generalAgent.listWorkflows())).toEqual([]);
   });
 

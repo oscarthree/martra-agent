@@ -39,10 +39,10 @@ AG-UI Mastra Adapter (@ag-ui/mastra)
     |                           |-- 地理编码和多日天气预报 -> Open-Meteo
     |                           `-- activityPlannerAgent -> 模板化活动规划
     |
-    `-- generalAgent（general 类型会话）：纯对话 + 图片理解（base64），无工具
+    `-- generalAgent（general 类型会话）：纯对话 + 图片理解（base64）+ 网页抓取（webOpenUrl / webOpenUrlRendered 无头浏览器）
 ```
 
-意图识别由 `weatherAgent` 根据指令自行选择工具：普通当前天气查询走 `weatherTool`，活动/行程/旅游/攻略/计划类请求走 `weatherWorkflow`（输入为 `{ city: string; days: number }`，days 为 1 到 7，默认 1）。`generalAgent` 不做意图路由，直接对话。
+意图识别由 `weatherAgent` 根据指令自行选择工具：普通当前天气查询走 `weatherTool`，活动/行程/旅游/攻略/计划类请求走 `weatherWorkflow`（输入为 `{ city: string; days: number }`，days 为 1 到 7，默认 1）。`generalAgent` 不做意图路由，直接对话；用户给出具体网址时调用 `webOpenUrl` 抓取页面 HTML 回答，遇到 JS 动态渲染或反爬拦截时改用 `webOpenUrlRendered`（无头浏览器，ADR 0003）；无主动搜索能力（ADR 0002）。
 
 ## 技术栈
 
@@ -53,6 +53,7 @@ AG-UI Mastra Adapter (@ag-ui/mastra)
 - **存储**：LibSQL（本地文件 `mastra.db`，部署时可切换 Turso）保存应用数据，DuckDB（`mastra.duckdb`）保存可观测性数据，二者经 `MastraCompositeStore` 组合
 - **校验**：zod v4
 - **测试**：Vitest
+- **无头浏览器**：Playwright（`webOpenUrlRendered` 工具，首次使用需 `pnpm exec playwright install chromium`）
 
 ## 常用命令
 
@@ -64,6 +65,7 @@ AG-UI Mastra Adapter (@ag-ui/mastra)
 | `pnpm client:build` | 构建前端生产版本（输出到 `dist/`） |
 | `pnpm test` | 运行 Vitest 测试（`vitest run`） |
 | `pnpm exec tsc --noEmit` | TypeScript 类型检查（无单独 lint 配置） |
+| `pnpm exec playwright install chromium` | 下载无头浏览器二进制（`webOpenUrlRendered` 工具的运行时依赖，约 300MB） |
 
 开发时需要同时运行 `pnpm start` 和 `pnpm client:dev` 两个进程。
 
@@ -100,7 +102,12 @@ src/
     │   ├── general-agent.test.ts      # generalAgent 定义形态与注册键测试
     │   └── activity-planner-agent.ts # 活动规划 Agent，被工作流调用
     ├── tools/
-    │   └── weather-tool.ts          # 当前天气工具（Open-Meteo）
+    │   ├── weather-tool.ts              # 当前天气工具（Open-Meteo）
+    │   ├── challenge-detection.ts       # 反爬挑战页识别（sec.douban.com / Cloudflare 类）
+    │   ├── web-open-url-tool.ts         # 网页抓取工具：抓取公开 URL 原始 HTML（ADR 0002）
+    │   ├── web-open-url-tool.test.ts    # 抓取成功/重定向/超时/非 HTML/挑战页/截断测试
+    │   ├── web-open-url-rendered-tool.ts      # 无头浏览器渲染抓取（Playwright，ADR 0003）
+    │   └── web-open-url-rendered-tool.test.ts # 渲染抓取测试（mock playwright，不启动浏览器）
     └── workflows/
         ├── weather-workflow.ts      # fetch-weather -> plan-activities 两步工作流
         └── weather-workflow.test.ts # 工作流输入 schema 校验测试
@@ -112,7 +119,7 @@ src/
 - `prototype/`、`wayfinder/`、`.scratch/`：原型和草稿目录，不属于主应用构建
 - `patches/` + `pnpm-workspace.yaml`：通过 pnpm `patchedDependencies` 给 `fast-json-patch@3.1.1` 打补丁
 - 根目录 `index.html` 是 Vite 入口，`vite.config.ts` 只配置了 React 插件和 `/api` 代理
-- `CLAUDE.md` 仅包含 `@AGENTS.md` 引用，以本文件为准
+- `CLAUDE.md` 已删除，以本文件为准
 
 ## 代码风格约定
 
@@ -134,7 +141,7 @@ src/
 ## 测试
 
 - 使用 Vitest，运行 `pnpm test`
-- 测试文件与源码同目录，命名为 `*.test.ts`（当前 3 个测试文件、71 个用例）
+- 测试文件与源码同目录，命名为 `*.test.ts`（当前 5 个测试文件、89 个用例）
 - 现有测试覆盖 zod schema 校验（工作流输入）和纯状态逻辑（workspace-state 的序列化/恢复/分组）；网络与模型调用不做集成测试
 - 提交前建议运行 `pnpm test` 和 `pnpm exec tsc --noEmit`
 

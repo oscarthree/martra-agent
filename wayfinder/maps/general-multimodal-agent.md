@@ -44,8 +44,11 @@
 ## Not yet specified
 
 - 大图体验：原图直发在多大尺寸下开始明显变慢，何时引入前端压缩。
-- 通用助手未来是否需要工具能力（联网搜索等），目前定位纯对话。
 - 视频输入（模型侧已支持，本轮不铺开）。
+
+## 后续决策
+
+- 通用助手联网能力（2026-08-25 grilling 收敛）：最初采用 coding 端点的 `$web_search` 内置工具 + echo 回传，详见 [ADR 0001](../../docs/adr/0001-web-search-builtin-on-coding-endpoint.md)。多轮实测跑不通后放弃，改为自建 `web_open_url` 抓取工具（ADR 0002），并为豆瓣类反爬挑战站点补充无头浏览器 `web_open_url_rendered`（ADR 0003）。助手无主动搜索能力，只能打开用户给出的具体 URL。
 
 ## Out of scope
 
