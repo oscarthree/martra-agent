@@ -101,6 +101,9 @@ src/
     │   ├── general-agent.ts           # 通用助手 Agent，纯对话、支持图片理解，无工具
     │   ├── general-agent.test.ts      # generalAgent 定义形态与注册键测试
     │   └── activity-planner-agent.ts # 活动规划 Agent，被工作流调用
+    ├── processors/
+    │   ├── tool-result-trimmer.ts      # 历史消息大段工具结果压缩（防请求体超限）
+    │   └── tool-result-trimmer.test.ts # 压缩/跳过/不可变性测试
     ├── tools/
     │   ├── weather-tool.ts              # 当前天气工具（Open-Meteo）
     │   ├── challenge-detection.ts       # 反爬挑战页识别（sec.douban.com / Cloudflare 类）
@@ -141,7 +144,7 @@ src/
 ## 测试
 
 - 使用 Vitest，运行 `pnpm test`
-- 测试文件与源码同目录，命名为 `*.test.ts`（当前 5 个测试文件、89 个用例）
+- 测试文件与源码同目录，命名为 `*.test.ts`（当前 6 个测试文件、93 个用例）
 - 现有测试覆盖 zod schema 校验（工作流输入）和纯状态逻辑（workspace-state 的序列化/恢复/分组）；网络与模型调用不做集成测试
 - 提交前建议运行 `pnpm test` 和 `pnpm exec tsc --noEmit`
 

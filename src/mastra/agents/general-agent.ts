@@ -1,4 +1,5 @@
 import { Agent } from '@mastra/core/agent';
+import { ToolResultTrimmer } from '../processors/tool-result-trimmer';
 import { webOpenUrlRenderedTool } from '../tools/web-open-url-rendered-tool';
 import { webOpenUrlTool } from '../tools/web-open-url-tool';
 import { kimi, SessionMemory } from './shared';
@@ -22,5 +23,7 @@ export const generalAgent = new Agent({
 - 回复应简洁明了且信息充足`,
   model: kimi.chatModel('kimi-k2.7-code'),
   tools: { webOpenUrl: webOpenUrlTool, webOpenUrlRendered: webOpenUrlRenderedTool },
+  // 历史消息里的大块抓取 HTML 在回放进请求前压缩，防止多轮后请求体超限（413）
+  inputProcessors: [new ToolResultTrimmer()],
   memory: new SessionMemory(),
 });
