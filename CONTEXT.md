@@ -42,7 +42,7 @@
 
 ## Project Agent Type
 
-项目的助手类型，取值"天气助手"（`weather`）或"通用助手"（`general`），新建项目时选择，创建后不可修改。会话在创建时从所属项目捕获该类型，并以此决定路由到哪个后端 agent；项目删除后会话进入未分类，类型保持不变。
+项目的助手类型，取值"天气助手"（`weather`）、"通用助手"（`general`）或"自定义助手"（`custom`），新建项目时选择，创建后不可修改。custom 类型的项目额外绑定一个 Workflow Definition（`customAgentId`）。会话在创建时从所属项目捕获该类型（custom 会话同时捕获 customAgentId），并以此决定路由到哪个后端 agent；项目删除后会话进入未分类，类型保持不变。
 
 ## General Assistant
 
@@ -55,3 +55,11 @@
 ## Image Placeholder
 
 图片占位符：图片消息的 base64 数据不进入 localStorage 快照，持久化前被替换为文本占位 part（"[图片未保存到本地]"）。刷新后历史中的图片位置显示该占位文案；在线会话视图中仍显示真实图片。
+
+## Custom Agent
+
+自定义 Agent：用户自行定义行为的助手类型。它的行为由一份 Workflow Definition 完整描述（没有额外的内置指令），通过 Project Agent Type 为 `custom` 的项目绑定到会话。与天气助手、通用助手并列存在。
+
+## Workflow Definition
+
+工作流定义：一份描述 Custom Agent 行为的图数据——节点（开始、LLM、工具、条件、结束）与连线的集合，经 Dify 风格的可视化画布编辑，保存时校验通过后才可被会话使用。节点间通过 `{{nodeId.output}}` 插值引用上游输出；条件分支按 if / else-if / else 短路求值。
