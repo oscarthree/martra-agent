@@ -5,6 +5,7 @@ import {
   CloudSun,
   FolderKanban,
   History,
+  Bot,
   MessageSquare,
   Pencil,
   Plus,
@@ -79,6 +80,8 @@ export type SidebarProps = {
   onOpenSession: (sessionId: string) => void;
   onRenameSession: (session: Session) => void;
   onDeleteSession: (session: Session) => void;
+  onOpenAgentManager: () => void;
+  agentManagerActive?: boolean;
 };
 
 const GROUP_LABELS: Array<[keyof SessionHistoryGroups, string]> = [
@@ -98,6 +101,8 @@ export function SidebarContent({
   onOpenSession,
   onRenameSession,
   onDeleteSession,
+  onOpenAgentManager,
+  agentManagerActive = false,
 }: SidebarProps) {
   const projectScopeActive =
     historyScope.kind === "project" &&
@@ -127,6 +132,14 @@ export function SidebarContent({
       >
         <span className="nav-icon"><History size={16} aria-hidden /></span>
         <span>会话历史</span>
+      </button>
+      <button
+        type="button"
+        className={agentManagerActive ? "nav-item active" : "nav-item"}
+        onClick={onOpenAgentManager}
+      >
+        <span className="nav-icon"><Bot size={16} aria-hidden /></span>
+        <span>自定义 Agent</span>
       </button>
 
       <section className="side-section">

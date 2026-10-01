@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import { StrictMode, useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   CopilotChatAttachmentQueue,
@@ -13,6 +13,8 @@ import type { Message } from "@ag-ui/core";
 import { Menu as MenuIcon, Plus } from "lucide-react";
 import "@copilotkit/react-core/v2/styles.css";
 import "./styles.css";
+import { AgentManagerView } from "./agent-manager";
+import { currentResourceId } from "./custom-agent-api";
 import {
   createProject,
   createSession,
@@ -44,9 +46,7 @@ import {
   SidebarContent,
 } from "./workspace-ui";
 
-const resourceId =
-  localStorage.getItem("mastra-resource-id") ?? crypto.randomUUID();
-localStorage.setItem("mastra-resource-id", resourceId);
+const resourceId = currentResourceId();
 
 type DialogState =
   | { kind: "project-create" }
@@ -69,6 +69,7 @@ function App() {
     projectId: initialLoad.workspace.activeProjectId,
   });
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [view, setView] = useState<"chat" | "agents">("chat");
   const [dialog, setDialog] = useState<DialogState>(null);
   const [chatError, setChatError] = useState<string | null>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
@@ -175,6 +176,11 @@ function App() {
       }}
       onSelectProject={handleSelectProject}
       onOpenSession={handleOpenSession}
+      onOpenAgentManager={() => {
+        setView("agents");
+        closeDrawer();
+      }}
+      agentManagerActive={view === "agents"}
       onRenameSession={(session) => {
         // 弹窗挂载在抽屉之外：先关抽屉，避免焦点陷阱冲突
         setDrawerOpen(false);
@@ -234,12 +240,19 @@ function App() {
             </div>
           </header>
           <section className="chat-panel">
-            <WorkspaceChat
-              session={activeSession}
-              onMessagesChange={handleMessagesChange}
-              sendError={chatError}
-              onSendErrorChange={setChatError}
-            />
+            {view === "agents" ? (
+              <AgentManagerView
+                workspace={workspace}
+                onExit={() => setView("chat")}
+              />
+            ) : (
+              <WorkspaceChat
+                session={activeSession}
+                onMessagesChange={handleMessagesChange}
+                sendError={chatError}
+                onSendErrorChange={setChatError}
+              />
+            )}
           </section>
         </div>
         {drawerOpen && <Drawer onClose={closeDrawer}>{sidebar}</Drawer>}
@@ -567,7 +580,7 @@ function WorkspaceChat({
 }
 
 createRoot(document.getElementById("root")!).render(
-  <React.StrictMode>
+  <StrictMode>
     <App />
-  </React.StrictMode>,
+  </StrictMode>,
 );

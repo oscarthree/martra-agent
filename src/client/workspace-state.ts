@@ -376,6 +376,16 @@ export function validateProjectName(
   return null;
 }
 
+// 自定义 Agent 的删除保护：统计绑定到该定义的项目数。
+// Project 的 customAgentId 字段随 custom 类型引入（见绑定路由票）；
+// 这里用结构类型参数保持前向兼容——旧数据没有该字段时计数自然为 0。
+export function countCustomAgentReferences(
+  projects: ReadonlyArray<{ id: string; customAgentId?: string }>,
+  customAgentId: string,
+): number {
+  return projects.filter((project) => project.customAgentId === customAgentId).length;
+}
+
 export function createProject(
   workspace: WorkspaceState,
   name: string,

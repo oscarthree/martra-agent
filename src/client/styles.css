@@ -531,3 +531,105 @@ button { border: 0; cursor: pointer; color: inherit; background: none; }
   .welcome { padding-top: 30px; }
   .welcome h1 { font-size: 32px; }
 }
+
+/* ---------- Custom agent manager ---------- */
+
+.agent-manager {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--wc-paper);
+}
+
+.agent-manager-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--wc-line);
+}
+
+.agent-manager-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  background: transparent;
+  color: var(--wc-muted);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 6px 8px;
+  border-radius: 8px;
+}
+.agent-manager-back:hover { background: var(--wc-soft); color: var(--wc-ink); }
+
+.agent-manager-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.agent-manager-new {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border: none;
+  border-radius: 9px;
+  background: var(--wc-accent);
+  color: #fff;
+  font-size: 13px;
+  cursor: pointer;
+}
+.agent-manager-new:hover { background: var(--wc-accent-hover); }
+
+.agent-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 20px;
+}
+
+.agent-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--wc-line);
+  border-radius: 12px;
+  margin-bottom: 8px;
+  background: var(--wc-paper);
+}
+.agent-row:hover { background: var(--wc-soft); }
+
+.agent-row-icon {
+  display: inline-flex;
+  color: var(--wc-muted);
+}
+
+.agent-row-main { flex: 1; min-width: 0; }
+.agent-row-name { font-weight: 500; font-size: 14px; }
+.agent-row-meta { color: var(--wc-muted); font-size: 12px; margin-top: 2px; }
+.agent-row-ref { color: var(--wc-accent); }
+
+.agent-row-actions { display: inline-flex; gap: 4px; }
+.agent-row-actions .icon-button:disabled { color: var(--wc-faint); cursor: not-allowed; }
+
+.agent-manager-status {
+  padding: 48px 20px;
+  text-align: center;
+  color: var(--wc-muted);
+}
+.agent-manager-hint { font-size: 12px; }
+.agent-manager-status button {
+  margin-top: 10px;
+  padding: 7px 14px;
+  border-radius: 9px;
+  border: 1px solid var(--wc-line);
+  background: var(--wc-paper);
+  cursor: pointer;
+}
+.agent-manager-status button:hover { background: var(--wc-soft); }

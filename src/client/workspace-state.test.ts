@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  countCustomAgentReferences,
   createDefaultWorkspace,
   createProject,
   createSession,
@@ -897,5 +898,26 @@ describe("workspace v1 migration", () => {
   it("still rejects unknown versions", () => {
     expect(() => parseWorkspace(JSON.stringify({ version: 3 })))
       .toThrow("Invalid workspace state");
+  });
+});
+
+describe("countCustomAgentReferences", () => {
+  it("counts projects bound to the definition and ignores the rest", () => {
+    const workspace = createDefaultWorkspace(() => "2026-08-11T00:00:00.000Z", sequentialIds());
+    const base = workspace.projects[0]!;
+    const projects = [
+      base,
+      { ...base, id: "p2", customAgentId: "def-1" },
+      { ...base, id: "p3", customAgentId: "def-1" },
+      { ...base, id: "p4", customAgentId: "def-2" },
+    ];
+    expect(countCustomAgentReferences(projects, "def-1")).toBe(2);
+    expect(countCustomAgentReferences(projects, "def-2")).toBe(1);
+    expect(countCustomAgentReferences(projects, "missing")).toBe(0);
+  });
+
+  it("is zero for workspaces without any custom projects", () => {
+    const workspace = createDefaultWorkspace(() => "2026-08-11T00:00:00.000Z", sequentialIds());
+    expect(countCustomAgentReferences(workspace.projects, "def-1")).toBe(0);
   });
 });
