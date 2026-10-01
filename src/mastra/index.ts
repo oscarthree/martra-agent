@@ -7,6 +7,9 @@ import { MastraCompositeStore } from '@mastra/core/storage';
 import { Observability, MastraStorageExporter, MastraPlatformExporter, SensitiveDataFilter } from '@mastra/observability';
 import { weatherWorkflow } from './workflows/weather-workflow';
 import { agents } from './agents';
+import { createCustomAgentsModule } from './custom-agents';
+
+export const customAgents = await createCustomAgentsModule();
 
 
 export const mastra = new Mastra({

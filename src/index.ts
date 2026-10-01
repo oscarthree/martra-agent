@@ -4,7 +4,7 @@ import { MastraServer } from "@mastra/express";
 import { MastraAgent } from "@ag-ui/mastra";
 import { CopilotRuntime } from "@copilotkit/runtime/v2";
 import { createCopilotExpressHandler } from "@copilotkit/runtime/v2/express";
-import { mastra } from "./mastra";
+import { mastra, customAgents } from "./mastra";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -38,6 +38,8 @@ app.use(
 app.get("/", (_req: Request, res: Response) => {
   res.json({ message: "Hello, World!" });
 });
+
+app.use("/api/custom-agents", customAgents.router);
 
 // Start server
 app.listen(PORT, () => {
