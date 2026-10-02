@@ -633,3 +633,61 @@ button { border: 0; cursor: pointer; color: inherit; background: none; }
   cursor: pointer;
 }
 .agent-manager-status button:hover { background: var(--wc-soft); }
+
+/* ---------- Custom agent session gate & binding ---------- */
+
+.session-gate {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 40px 24px;
+  color: var(--wc-muted);
+  text-align: center;
+}
+.session-gate-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--wc-ink);
+}
+.session-gate-body {
+  margin: 0;
+  font-size: 13px;
+  max-width: 420px;
+}
+
+.agent-binding-field {
+  margin-top: 10px;
+}
+.agent-binding-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--wc-muted);
+}
+.agent-binding-link {
+  margin-left: 6px;
+  border: none;
+  background: transparent;
+  color: var(--wc-accent);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 0;
+}
+.agent-binding-link:hover {
+  text-decoration: underline;
+}
+.agent-binding-select {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--wc-line);
+  border-radius: 8px;
+  background: var(--wc-paper);
+  font-size: 13px;
+  color: var(--wc-ink);
+}
+.agent-binding-select:focus-visible {
+  outline: 3px solid var(--wc-focus-ring);
+  border-color: var(--wc-accent);
+}

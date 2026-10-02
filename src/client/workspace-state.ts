@@ -3,12 +3,14 @@ import { MessageSchema, type Message } from "@ag-ui/core";
 export const WORKSPACE_VERSION = 2;
 export const WORKSPACE_STORAGE_KEY = "weather-copilot-workspace-v1";
 
-export type AgentType = "weather" | "general";
+export type AgentType = "weather" | "general" | "custom";
 
 export type Project = {
   id: string;
   name: string;
   agentType: AgentType;
+  /** custom 类型绑定的自定义 Agent 定义 id（创建时捕获、不可修改） */
+  customAgentId?: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -17,6 +19,8 @@ export type Session = {
   id: string;
   projectId: string | null;
   agentType: AgentType;
+  /** 从项目捕获的自定义 Agent 定义 id；custom 会话缺它即错误态 */
+  customAgentId?: string;
   title: string;
   messages: Message[];
   createdAt: string;
@@ -35,14 +39,21 @@ export const DEFAULT_PROJECT_NAME = "天气助手";
 export const DEFAULT_AGENT_TYPE: AgentType = "weather";
 
 // The client picks one runtime agent per session via these Mastra
-// registration keys (see the agents registry on the server side).
-const RUNTIME_AGENT_IDS: Record<AgentType, string> = {
+// registration keys (see the agents registry on the server side). Custom
+// sessions route per definition as `custom-<definitionId>`; a custom session
+// without a definition id is an error state — never fall back.
+const RUNTIME_AGENT_IDS: Record<Exclude<AgentType, "custom">, string> = {
   weather: "weatherAgent",
   general: "generalAgent",
 };
 
-export function runtimeAgentIdFor(agentType: AgentType): string {
-  return RUNTIME_AGENT_IDS[agentType];
+export function runtimeAgentIdFor(
+  session: Pick<Session, "agentType" | "customAgentId">,
+): string | null {
+  if (session.agentType === "custom") {
+    return session.customAgentId ? `custom-${session.customAgentId}` : null;
+  }
+  return RUNTIME_AGENT_IDS[session.agentType];
 }
 
 export function createDefaultWorkspace(
@@ -253,8 +264,16 @@ function emptyProject(
   name: string,
   timestamp: string,
   agentType: AgentType,
+  customAgentId?: string,
 ): Project {
-  return { id, name, agentType, createdAt: timestamp, updatedAt: timestamp };
+  return {
+    id,
+    name,
+    agentType,
+    ...(customAgentId ? { customAgentId } : {}),
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
 }
 
 function emptySession(
@@ -262,11 +281,13 @@ function emptySession(
   projectId: string | null,
   timestamp: string,
   agentType: AgentType,
+  customAgentId?: string,
 ): Session {
   return {
     id,
     projectId,
     agentType,
+    ...(customAgentId ? { customAgentId } : {}),
     title: DEFAULT_SESSION_TITLE,
     messages: [],
     createdAt: timestamp,
@@ -284,6 +305,13 @@ function agentTypeForProject(
   );
 }
 
+function customAgentForProject(
+  workspace: WorkspaceState,
+  projectId: string | null,
+): string | undefined {
+  return workspace.projects.find((project) => project.id === projectId)?.customAgentId;
+}
+
 export function createSession(
   workspace: WorkspaceState,
   options: SessionChangeOptions = {},
@@ -296,6 +324,7 @@ export function createSession(
     workspace.activeProjectId,
     timestamp,
     agentTypeForProject(workspace, workspace.activeProjectId),
+    customAgentForProject(workspace, workspace.activeProjectId),
   );
 
   return {
@@ -389,18 +418,16 @@ export function countCustomAgentReferences(
 export function createProject(
   workspace: WorkspaceState,
   name: string,
-  options: SessionChangeOptions & { agentType?: AgentType } = {},
+  options: SessionChangeOptions & { agentType?: AgentType; customAgentId?: string } = {},
 ): WorkspaceState {
   const now = resolveNow(options);
   const createId = resolveCreateId(options);
   const timestamp = now();
-  const project = emptyProject(
-    createId(),
-    name,
-    timestamp,
-    options.agentType ?? DEFAULT_AGENT_TYPE,
-  );
-  const session = emptySession(createId(), project.id, timestamp, project.agentType);
+  const agentType = options.agentType ?? DEFAULT_AGENT_TYPE;
+  // 绑定只服务 custom 类型：其它类型即使传了也丢弃，保持不变量
+  const customAgentId = agentType === "custom" ? options.customAgentId : undefined;
+  const project = emptyProject(createId(), name, timestamp, agentType, customAgentId);
+  const session = emptySession(createId(), project.id, timestamp, project.agentType, project.customAgentId);
 
   return {
     ...workspace,
@@ -506,6 +533,7 @@ export function deleteSession(
     target.projectId,
     timestamp,
     agentTypeForProject(workspace, target.projectId),
+    customAgentForProject(workspace, target.projectId),
   );
 
   return {
@@ -617,7 +645,11 @@ function isWorkspaceState(value: unknown): value is WorkspaceState {
 }
 
 function isAgentType(value: unknown): value is AgentType {
-  return value === "weather" || value === "general";
+  return value === "weather" || value === "general" || value === "custom";
+}
+
+function isOptionalString(value: unknown): boolean {
+  return value === undefined || typeof value === "string";
 }
 
 function isProject(value: unknown): value is Project {
@@ -628,6 +660,7 @@ function isProject(value: unknown): value is Project {
     typeof project.id === "string" &&
     typeof project.name === "string" &&
     isAgentType(project.agentType) &&
+    isOptionalString(project.customAgentId) &&
     typeof project.createdAt === "string" &&
     typeof project.updatedAt === "string"
   );
@@ -641,6 +674,7 @@ function isSession(value: unknown): value is Session {
     typeof session.id === "string" &&
     (typeof session.projectId === "string" || session.projectId === null) &&
     isAgentType(session.agentType) &&
+    isOptionalString(session.customAgentId) &&
     typeof session.title === "string" &&
     Array.isArray(session.messages) &&
     session.messages.every((message) => MessageSchema.safeParse(message).success) &&

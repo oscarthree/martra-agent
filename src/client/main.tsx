@@ -14,7 +14,7 @@ import { Menu as MenuIcon, Plus } from "lucide-react";
 import "@copilotkit/react-core/v2/styles.css";
 import "./styles.css";
 import { AgentManagerView } from "./agent-manager";
-import { currentResourceId } from "./custom-agent-api";
+import { currentResourceId, CustomAgentApiError, getCustomAgent } from "./custom-agent-api";
 import {
   createProject,
   createSession,
@@ -147,7 +147,7 @@ function App() {
     closeDrawer();
   }, [closeDrawer]);
 
-  const handleCreateProject = (name: string, agentType: AgentType) => {
+  const handleCreateProject = (name: string, agentType: AgentType, customAgentId?: string) => {
     // 预生成 id：StrictMode 会重复执行 updater，id 必须保持确定
     const ids = [crypto.randomUUID(), crypto.randomUUID()];
     let call = 0;
@@ -155,6 +155,7 @@ function App() {
       createProject(current, name, {
         createId: () => ids[call++ % 2]!,
         agentType,
+        customAgentId,
       }),
     );
     setHistoryScope({ kind: "project", projectId: ids[0]! });
@@ -263,6 +264,10 @@ function App() {
           mode="create"
           validate={(name) => validateProjectName(workspace, name)}
           onSubmit={handleCreateProject}
+          onOpenAgentManager={() => {
+            setDialog(null);
+            setView("agents");
+          }}
           onClose={() => setDialog(null)}
         />
       )}
@@ -360,6 +365,12 @@ const WELCOME_CONTENT: Record<AgentType, WelcomeContent> = {
     copy: "日常问答、闲聊、写作、翻译都可以。直接输入你的问题，我们开始。",
     suggestions: [],
   },
+  custom: {
+    kicker: "CUSTOM AGENT",
+    title: "开始对话",
+    copy: "该助手由自定义 Agent 定义驱动，会按编排好的工作流处理你的消息。",
+    suggestions: [],
+  },
 };
 
 // 附件只接受图片；useAttachments 配置与隐藏 file input 共用同一来源。
@@ -406,9 +417,141 @@ function WorkspaceChat({
   sendError: string | null;
   onSendErrorChange: (error: string | null) => void;
 }) {
+  // custom 会话先过定义门禁：绑定缺失或定义被删除时显示错误态、不挂 useAgent
+  if (session.agentType === "custom") {
+    return (
+      <CustomAgentGate
+        session={session}
+        onMessagesChange={onMessagesChange}
+        sendError={sendError}
+        onSendErrorChange={onSendErrorChange}
+      />
+    );
+  }
+  // 非 custom 不可能是 null：真出现说明状态模型被破坏，宁可抛错也不静默降级
+  const runtimeAgentId = runtimeAgentIdFor(session);
+  if (runtimeAgentId === null) {
+    throw new Error("非 custom 会话缺少 runtimeAgentId");
+  }
+  return (
+    <ChatView
+      session={session}
+      runtimeAgentId={runtimeAgentId}
+      onMessagesChange={onMessagesChange}
+      sendError={sendError}
+      onSendErrorChange={onSendErrorChange}
+    />
+  );
+}
+
+// custom 会话门禁：按捕获的定义 id 拉取定义。404（已删除）或绑定缺失 → 错误态且输入禁用；
+// 定义更新即生效（会话只存 id，每次进入重新校验）。
+function CustomAgentGate({
+  session,
+  onMessagesChange,
+  sendError,
+  onSendErrorChange,
+}: {
+  session: Session;
+  onMessagesChange: (messages: Message[]) => void;
+  sendError: string | null;
+  onSendErrorChange: (error: string | null) => void;
+}) {
+  const definitionId = session.customAgentId;
+  const [gate, setGate] = useState<
+    | { kind: "loading" }
+    | { kind: "ready" }
+    | { kind: "deleted" }
+    | { kind: "error"; message: string }
+  >({ kind: "loading" });
+
+  useEffect(() => {
+    if (!definitionId) {
+      setGate({ kind: "deleted" });
+      return;
+    }
+    let cancelled = false;
+    setGate({ kind: "loading" });
+    getCustomAgent(definitionId)
+      .then(() => {
+        if (!cancelled) setGate({ kind: "ready" });
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        if (error instanceof CustomAgentApiError && error.status === 404) {
+          setGate({ kind: "deleted" });
+        } else {
+          setGate({
+            kind: "error",
+            message: error instanceof Error ? error.message : "加载失败",
+          });
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [definitionId]);
+
+  if (gate.kind === "loading") {
+    return <div className="session-gate">正在加载自定义 Agent…</div>;
+  }
+  if (gate.kind === "deleted") {
+    return (
+      <div className="session-gate" role="alert">
+        <div className="session-gate-title">该自定义 Agent 已被删除</div>
+        <p className="session-gate-body">
+          此会话无法再发送消息。可以在侧栏把会话移到其他项目，或留在未分类。
+        </p>
+      </div>
+    );
+  }
+  if (gate.kind === "error") {
+    return (
+      <div className="session-gate" role="alert">
+        <div className="session-gate-title">自定义 Agent 加载失败</div>
+        <p className="session-gate-body">{gate.message}</p>
+      </div>
+    );
+  }
+  // 绑定缺失与已删除同走错误态；正常命中时路由键与推导函数同一来源
+  const runtimeAgentId = runtimeAgentIdFor(session);
+  if (runtimeAgentId === null) {
+    return (
+      <div className="session-gate" role="alert">
+        <div className="session-gate-title">该自定义 Agent 已被删除</div>
+        <p className="session-gate-body">
+          此会话无法再发送消息。可以在侧栏把会话移到其他项目，或留在未分类。
+        </p>
+      </div>
+    );
+  }
+  return (
+    <ChatView
+      session={session}
+      runtimeAgentId={runtimeAgentId}
+      onMessagesChange={onMessagesChange}
+      sendError={sendError}
+      onSendErrorChange={onSendErrorChange}
+    />
+  );
+}
+
+function ChatView({
+  session,
+  runtimeAgentId,
+  onMessagesChange,
+  sendError,
+  onSendErrorChange,
+}: {
+  session: Session;
+  runtimeAgentId: string;
+  onMessagesChange: (messages: Message[]) => void;
+  sendError: string | null;
+  onSendErrorChange: (error: string | null) => void;
+}) {
   const { agent } = useAgent({
     agentId: `workspace-session-${session.id}`,
-    runtimeAgentId: runtimeAgentIdFor(session.agentType),
+    runtimeAgentId,
     threadId: session.id,
     updates: [UseAgentUpdate.OnMessagesChanged, UseAgentUpdate.OnRunStatusChanged],
   });

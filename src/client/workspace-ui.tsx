@@ -11,6 +11,7 @@ import {
   Plus,
   Trash2,
 } from "lucide-react";
+import { listCustomAgentSummaries } from "./custom-agent-api";
 import {
   DEFAULT_AGENT_TYPE,
   type AgentType,
@@ -450,18 +451,45 @@ export function ProjectFormDialog({
   initialName = "",
   validate,
   onSubmit,
+  onOpenAgentManager,
   onClose,
 }: {
   mode: "create" | "rename";
   initialName?: string;
   validate: (name: string) => string | null;
-  onSubmit: (name: string, agentType: AgentType) => void;
+  onSubmit: (name: string, agentType: AgentType, customAgentId?: string) => void;
+  onOpenAgentManager?: () => void;
   onClose: () => void;
 }) {
   const [name, setName] = useState(initialName);
   const [agentType, setAgentType] = useState<AgentType>(DEFAULT_AGENT_TYPE);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // 自定义 Agent 定义下拉：弹窗打开即强制刷新列表（缓存按 resource-id 隔离）
+  const [definitions, setDefinitions] = useState<
+    | { kind: "loading" }
+    | { kind: "ok"; items: Array<{ id: string; name: string }> }
+    | { kind: "error" }
+  >({ kind: "loading" });
+  const [selectedDefinitionId, setSelectedDefinitionId] = useState("");
+
+  useEffect(() => {
+    if (mode !== "create") return;
+    let cancelled = false;
+    listCustomAgentSummaries({ force: true })
+      .then((items) => {
+        if (cancelled) return;
+        const sorted = [...items].sort((left, right) => left.name.localeCompare(right.name, "zh"));
+        setDefinitions({ kind: "ok", items: sorted });
+      })
+      .catch(() => {
+        if (!cancelled) setDefinitions({ kind: "error" });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [mode]);
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -474,7 +502,29 @@ export function ProjectFormDialog({
       setError(problem);
       return;
     }
-    onSubmit(name.trim(), agentType);
+    if (mode === "create" && agentType === "custom") {
+      if (definitions.kind === "loading") {
+        setError("定义列表加载中，请稍候");
+        return;
+      }
+      if (definitions.kind === "error") {
+        setError("定义列表加载失败，请重试");
+        return;
+      }
+      if (definitions.items.length === 0) {
+        setError("还没有自定义 Agent，请先创建");
+        return;
+      }
+      if (!selectedDefinitionId) {
+        setError("请选择要绑定的自定义 Agent");
+        return;
+      }
+    }
+    onSubmit(
+      name.trim(),
+      agentType,
+      mode === "create" && agentType === "custom" ? selectedDefinitionId : undefined,
+    );
     onClose();
   };
 
@@ -525,6 +575,62 @@ export function ProjectFormDialog({
               <span className="agent-type-hint">日常问答与闲聊</span>
             </span>
           </label>
+          <label className="agent-type-option">
+            <input
+              type="radio"
+              name="agent-type"
+              checked={agentType === "custom"}
+              onChange={() => setAgentType("custom")}
+            />
+            <span>
+              自定义助手
+              <span className="agent-type-hint">绑定一个自定义 Agent，按其编排的流程回复</span>
+            </span>
+          </label>
+          {agentType === "custom" && (
+            <div className="agent-binding-field">
+              {definitions.kind === "loading" && (
+                <p className="agent-binding-hint">正在加载自定义 Agent 列表…</p>
+              )}
+              {definitions.kind === "error" && (
+                <p className="agent-binding-hint">自定义 Agent 列表加载失败，请关闭后重试。</p>
+              )}
+              {definitions.kind === "ok" && definitions.items.length === 0 && (
+                <p className="agent-binding-hint">
+                  还没有自定义 Agent。
+                  {onOpenAgentManager && (
+                    <button
+                      type="button"
+                      className="agent-binding-link"
+                      onClick={() => {
+                        onOpenAgentManager();
+                      }}
+                    >
+                      去创建
+                    </button>
+                  )}
+                </p>
+              )}
+              {definitions.kind === "ok" && definitions.items.length > 0 && (
+                <select
+                  className="agent-binding-select"
+                  aria-label="选择自定义 Agent"
+                  value={selectedDefinitionId}
+                  onChange={(event) => {
+                    setSelectedDefinitionId(event.target.value);
+                    setError(null);
+                  }}
+                >
+                  <option value="">请选择自定义 Agent</option>
+                  {definitions.items.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+          )}
         </fieldset>
       )}
       <div className="modal-actions">

@@ -829,8 +829,116 @@ describe("sanitizeMessagesForStorage", () => {
 
 describe("runtimeAgentIdFor", () => {
   it("maps each agent type to its Mastra registration key", () => {
-    expect(runtimeAgentIdFor("weather")).toBe("weatherAgent");
-    expect(runtimeAgentIdFor("general")).toBe("generalAgent");
+    expect(runtimeAgentIdFor({ agentType: "weather" })).toBe("weatherAgent");
+    expect(runtimeAgentIdFor({ agentType: "general" })).toBe("generalAgent");
+  });
+
+  it("derives custom-<id> for custom sessions bound to a definition", () => {
+    expect(runtimeAgentIdFor({ agentType: "custom", customAgentId: "def-1" })).toBe(
+      "custom-def-1",
+    );
+  });
+
+  it("returns null for custom sessions missing the definition id (错误态，不 fallback)", () => {
+    expect(runtimeAgentIdFor({ agentType: "custom" })).toBeNull();
+    expect(runtimeAgentIdFor({ agentType: "custom", customAgentId: "" })).toBeNull();
+  });
+});
+
+describe("custom agent binding", () => {
+  const at = () => "2026-08-11T00:00:00.000Z";
+
+  it("createProject captures customAgentId on the project and its first session", () => {
+    const workspace = createDefaultWorkspace(at, sequentialIds());
+    const next = createProject(workspace, "自定义项目", {
+      agentType: "custom",
+      customAgentId: "def-9",
+      createId: sequentialIds("new"),
+    });
+
+    const project = next.projects.find((p) => p.name === "自定义项目");
+    expect(project?.agentType).toBe("custom");
+    expect(project?.customAgentId).toBe("def-9");
+
+    const session = next.sessions.find((s) => s.projectId === project?.id);
+    expect(session?.agentType).toBe("custom");
+    expect(session?.customAgentId).toBe("def-9");
+  });
+
+  it("createSession captures agentType and customAgentId from the custom project", () => {
+    let workspace = createDefaultWorkspace(at, sequentialIds());
+    workspace = createProject(workspace, "自定义项目", {
+      agentType: "custom",
+      customAgentId: "def-9",
+      createId: sequentialIds("new"),
+    });
+    const projectId = workspace.activeProjectId;
+    workspace = switchProject(workspace, workspace.projects[0]!.id);
+    workspace = switchProject(workspace, projectId);
+    const next = createSession(workspace, { createId: sequentialIds("sess") });
+
+    const session = next.sessions[next.sessions.length - 1]!;
+    expect(session.agentType).toBe("custom");
+    expect(session.customAgentId).toBe("def-9");
+  });
+
+  it("round-trips custom projects and sessions through serialize/parse (v2 不升版)", () => {
+    let workspace = createDefaultWorkspace(at, sequentialIds());
+    workspace = createProject(workspace, "自定义项目", {
+      agentType: "custom",
+      customAgentId: "def-9",
+      createId: sequentialIds("new"),
+    });
+
+    const restored = parseWorkspace(serializeWorkspace(workspace));
+
+    expect(restored).toEqual(workspace);
+    expect(restored.version).toBe(2);
+    const project = restored.projects.find((p) => p.agentType === "custom");
+    expect(project?.customAgentId).toBe("def-9");
+  });
+
+  it("parses v2 payloads without customAgentId (旧数据天然合法)", () => {
+    const workspace = createDefaultWorkspace(at, sequentialIds());
+    const payload = JSON.parse(serializeWorkspace(workspace)) as Record<string, unknown>;
+    delete (payload.projects as Array<Record<string, unknown>>)[0]!.customAgentId;
+    delete (payload.sessions as Array<Record<string, unknown>>)[0]!.customAgentId;
+
+    const restored = parseWorkspace(JSON.stringify(payload));
+
+    expect(restored.projects[0]?.agentType).toBe("weather");
+    expect(restored.projects[0]?.customAgentId).toBeUndefined();
+  });
+
+  it("deleted projects leave custom sessions unclassified but still bound", () => {
+    let workspace = createDefaultWorkspace(at, sequentialIds());
+    workspace = createProject(workspace, "自定义项目", {
+      agentType: "custom",
+      customAgentId: "def-9",
+      createId: sequentialIds("new"),
+    });
+    const customProjectId = workspace.activeProjectId;
+
+    const next = deleteProject(workspace, customProjectId, { createId: sequentialIds("fb") });
+
+    const session = next.sessions.find((s) => s.customAgentId === "def-9");
+    expect(session?.projectId).toBeNull();
+    expect(session?.agentType).toBe("custom");
+    expect(session?.customAgentId).toBe("def-9");
+  });
+
+  it("ignores customAgentId on non-custom projects (绑定不变量)", () => {
+    const workspace = createDefaultWorkspace(at, sequentialIds());
+    const next = createProject(workspace, "天气项目", {
+      agentType: "weather",
+      customAgentId: "def-9",
+      createId: sequentialIds("new"),
+    });
+
+    const project = next.projects.find((p) => p.name === "天气项目");
+    expect(project?.customAgentId).toBeUndefined();
+    const session = next.sessions.find((s) => s.projectId === project?.id);
+    expect(session?.customAgentId).toBeUndefined();
   });
 });
 
