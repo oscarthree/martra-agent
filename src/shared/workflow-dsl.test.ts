@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   evaluateConditionExpression,
+  extractTemplateNodeIds,
   renderTemplate,
   validateWorkflowGraph,
   workflowGraphSchema,
@@ -325,6 +326,13 @@ describe('renderTemplate', () => {
 
   it('returns text without references unchanged', () => {
     expect(renderTemplate('纯文本', { n1: 'x' }).text).toBe('纯文本');
+  });
+});
+
+describe('extractTemplateNodeIds', () => {
+  it('collects node ids from well-formed output references only', () => {
+    expect(extractTemplateNodeIds('a {{n1.output}} b {{n2.output}} c {{bad}} d {{n1.output}}')).toEqual(['n1', 'n2']);
+    expect(extractTemplateNodeIds('无引用')).toEqual([]);
   });
 });
 

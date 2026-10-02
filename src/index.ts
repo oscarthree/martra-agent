@@ -4,7 +4,7 @@ import { MastraServer } from "@mastra/express";
 import { MastraAgent } from "@ag-ui/mastra";
 import { CopilotRuntime } from "@copilotkit/runtime/v2";
 import { createCopilotExpressHandler } from "@copilotkit/runtime/v2/express";
-import { mastra, customAgents } from "./mastra";
+import { mastra, customAgents, customAgentRegistry } from "./mastra";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -19,11 +19,12 @@ const server = new MastraServer({ app, mastra });
 await server.init();
 
 const copilotRuntime = new CopilotRuntime({
-  agents: ({ request }) =>
-    MastraAgent.getLocalAgents({
-      mastra,
-      resourceId: request.headers.get("x-mastra-resource-id") || "default",
-    }),
+  agents: async ({ request }) => {
+    const resourceId = request.headers.get("x-mastra-resource-id") || "default";
+    // 动态注册的自定义 Agent 在本请求枚举前 ensure，注册后即能按 custom-<id> 路由
+    await customAgentRegistry.ensureAgentsForResource(resourceId);
+    return MastraAgent.getLocalAgents({ mastra, resourceId });
+  },
 });
 
 app.use(

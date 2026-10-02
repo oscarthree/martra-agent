@@ -345,6 +345,18 @@ function extractRawRefs(template: string): string[] {
   return [...template.matchAll(TEMPLATE_RE)].map((match) => match[1] ?? '');
 }
 
+// 提取模板里所有格式合法的 {{nodeId.output}} 引用的节点 id（供编译期按需读取上游输出）
+export function extractTemplateNodeIds(template: string): string[] {
+  const nodeIds = new Set<string>();
+  for (const raw of extractRawRefs(template)) {
+    const ref = parseRef(raw);
+    if (ref !== null && ref.field === 'output') {
+      nodeIds.add(ref.nodeId);
+    }
+  }
+  return [...nodeIds];
+}
+
 export interface RenderedTemplate {
   text: string;
   /** 引用了但 outputs 中不存在的节点 id（防御性替换为空串） */

@@ -19,3 +19,8 @@ export function getToolRegistry(): ToolRegistryEntry[] {
 export function getToolNames(): string[] {
   return registeredTools.map((tool) => tool.id);
 }
+
+// 按注册表 id 取工具实例（编译工具节点用；toolName 合法性由 DSL 校验保证）
+export function getToolByName(name: string) {
+  return registeredTools.find((tool) => tool.id === name);
+}

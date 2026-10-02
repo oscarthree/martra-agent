@@ -7,10 +7,9 @@ import { MastraCompositeStore } from '@mastra/core/storage';
 import { Observability, MastraStorageExporter, MastraPlatformExporter, SensitiveDataFilter } from '@mastra/observability';
 import { weatherWorkflow } from './workflows/weather-workflow';
 import { agents } from './agents';
-import { createCustomAgentsModule } from './custom-agents';
+import { createCustomAgentsModule, createRegistryFor } from './custom-agents';
 
 export const customAgents = await createCustomAgentsModule();
-
 
 export const mastra = new Mastra({
   workflows: { weatherWorkflow },
@@ -47,3 +46,7 @@ export const mastra = new Mastra({
     },
   }),
 });
+
+// 自定义 Agent 运行期注册表：CopilotKit 每请求枚举 agents 前对本 resource ensure
+// （新定义编译注册、updatedAt 变化重编译重注册）。
+export const customAgentRegistry = createRegistryFor(mastra, customAgents.client);

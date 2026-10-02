@@ -1,6 +1,7 @@
 import { createStep, createWorkflow } from '@mastra/core/workflows';
 import { z } from 'zod';
 import { activityPlannerAgent } from '../agents/activity-planner-agent';
+import { withRetry } from '../utils/retry';
 
 const dailyForecastSchema = z.object({
   date: z.string(),
@@ -14,23 +15,6 @@ const forecastSchema = z.object({
   location: z.string(),
   forecasts: z.array(dailyForecastSchema),
 })
-
-async function withRetry<T>(operation: () => Promise<T>, label: string): Promise<T> {
-  let lastError: unknown;
-
-  for (let attempt = 1; attempt <= 3; attempt += 1) {
-    try {
-      return await operation();
-    } catch (error) {
-      lastError = error;
-      if (attempt < 3) {
-        await new Promise((resolve) => setTimeout(resolve, 250 * 2 ** (attempt - 1)));
-      }
-    }
-  }
-
-  throw new Error(`${label} failed after 3 attempts: ${String(lastError)}`);
-}
 
 function requiredAt<T>(values: T[], index: number, field: string): T {
   const value = values[index];
