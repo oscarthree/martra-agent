@@ -16,9 +16,11 @@ import { ConfirmDialog, Modal } from "./workspace-ui";
 export function AgentManagerView({
   workspace,
   onExit,
+  onEditAgent,
 }: {
   workspace: WorkspaceState;
   onExit: () => void;
+  onEditAgent: (definitionId: string) => void;
 }) {
   const [summaries, setSummaries] = useState<CustomAgentSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -117,8 +119,8 @@ export function AgentManagerView({
                     type="button"
                     className="icon-button small"
                     aria-label={`编辑 ${agent.name}`}
-                    title="画布编辑器即将提供"
-                    disabled
+                    title="编辑"
+                    onClick={() => onEditAgent(agent.id)}
                   >
                     <SquarePen size={13} aria-hidden />
                   </button>
@@ -150,7 +152,13 @@ export function AgentManagerView({
       {dialog?.kind === "create" && (
         <AgentNameDialog
           mode="create"
-          onSubmit={(name) => runMutation(createCustomAgent(name), "创建失败")}
+          onSubmit={(name) => {
+            void createCustomAgent(name)
+              .then((detail) => onEditAgent(detail.id))
+              .catch((submitError: unknown) =>
+                setError(submitError instanceof Error ? submitError.message : "创建失败"),
+              );
+          }}
           onClose={() => setDialog(null)}
         />
       )}

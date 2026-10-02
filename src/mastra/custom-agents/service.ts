@@ -28,6 +28,8 @@ export interface CustomAgentsService {
   create(resourceId: string, body: unknown): Promise<ApiResult>;
   update(resourceId: string, id: string, body: unknown): Promise<ApiResult>;
   remove(resourceId: string, id: string): Promise<ApiResult>;
+  /** 后端工具注册表清单（编辑器工具节点选项用） */
+  toolRegistry(): ApiResult;
 }
 
 const createBodySchema = z.object({
@@ -86,9 +88,13 @@ function notFound(): ApiResult {
   return { status: 404, body: { errors: [{ code: 'not_found', message: '自定义 Agent 定义不存在' }] } };
 }
 
-export function createCustomAgentsService(deps: { client: Client; toolNames: readonly string[] }): CustomAgentsService {
+export function createCustomAgentsService(deps: {
+  client: Client;
+  tools: ReadonlyArray<{ name: string; description: string }>;
+}): CustomAgentsService {
+  const toolNames = deps.tools.map((tool) => tool.name);
   const validateGraph = (graph: unknown): { ok: true; graph: WorkflowGraph } | { ok: false; result: ApiResult } => {
-    const result = validateWorkflowGraph(graph, { toolNames: deps.toolNames });
+    const result = validateWorkflowGraph(graph, { toolNames });
     return result.ok ? { ok: true, graph: result.graph } : { ok: false, result: errorResult(400, result.errors) };
   };
 
@@ -147,6 +153,10 @@ export function createCustomAgentsService(deps: { client: Client; toolNames: rea
     async remove(resourceId, id) {
       const deleted = await deleteCustomAgent(deps.client, id, resourceId);
       return deleted ? { status: 200, body: { deleted: true } } : notFound();
+    },
+
+    toolRegistry() {
+      return { status: 200, body: [...deps.tools] };
     },
   };
 }

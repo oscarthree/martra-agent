@@ -18,6 +18,11 @@ export type CustomAgentSummary = {
   updatedAt: number;
 };
 
+export type ToolRegistryEntry = {
+  name: string;
+  description: string;
+};
+
 export type CustomAgentDetail = {
   id: string;
   name: string;
@@ -115,4 +120,8 @@ export async function renameCustomAgent(id: string, name: string): Promise<Custo
 
 export async function deleteCustomAgent(id: string): Promise<void> {
   await request(`/${id}`, { method: "DELETE" });
+}
+
+export function getToolRegistry(): Promise<ToolRegistryEntry[]> {
+  return request<ToolRegistryEntry[]>("/tools");
 }

@@ -34,6 +34,15 @@ export function createCustomAgentsRouter(service: CustomAgentsService): Router {
     }),
   );
 
+  // 必须在 /:id 之前注册，避免被当作 id 路由
+  router.get(
+    '/tools',
+    asyncRoute(async (_req, res) => {
+      const result = service.toolRegistry();
+      res.status(result.status).json(result.body);
+    }),
+  );
+
   router.get(
     '/:id',
     asyncRoute(async (req, res) => {

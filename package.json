@@ -34,6 +34,7 @@
     "@mastra/loggers": "^1.2.0",
     "@mastra/memory": "^1.23.0",
     "@mastra/observability": "^1.16.1",
+    "@xyflow/react": "^12.12.0",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "lucide-react": "^1.33.0",

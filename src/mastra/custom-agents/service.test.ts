@@ -4,7 +4,11 @@ import { validateWorkflowGraph } from '../../shared/workflow-dsl';
 import { createCustomAgentsService, createDefaultTemplateGraph, type ApiResult } from './service';
 import { ensureCustomAgentsTable } from './store';
 
-const TOOLS = ['get-weather', 'web-open-url', 'web-open-url-rendered'];
+const TOOLS = [
+  { name: 'get-weather', description: '获取指定地点的当前天气' },
+  { name: 'web-open-url', description: '抓取网页' },
+  { name: 'web-open-url-rendered', description: '无头浏览器渲染抓取' },
+];
 
 let client: Client;
 let service: ReturnType<typeof createCustomAgentsService>;
@@ -12,7 +16,7 @@ let service: ReturnType<typeof createCustomAgentsService>;
 beforeEach(async () => {
   client = createClient({ url: ':memory:' });
   await ensureCustomAgentsTable(client);
-  service = createCustomAgentsService({ client, toolNames: TOOLS });
+  service = createCustomAgentsService({ client, tools: TOOLS });
 });
 
 const VALID_GRAPH = {
@@ -32,7 +36,7 @@ function errorsOf(result: ApiResult): Array<{ code: string; message: string; nod
 describe('createDefaultTemplateGraph', () => {
   it('produces a start → llm → end graph that passes validation and demos interpolation', () => {
     const graph = createDefaultTemplateGraph();
-    const result = validateWorkflowGraph(graph, { toolNames: TOOLS });
+    const result = validateWorkflowGraph(graph, { toolNames: TOOLS.map((tool) => tool.name) });
     expect(result.ok).toBe(true);
     expect(graph.nodes.map((n) => n.type)).toEqual(['start', 'llm', 'end']);
     const llm = graph.nodes.find((n) => n.type === 'llm');
@@ -136,6 +140,12 @@ describe('service.get / list / remove', () => {
     expect((await service.remove('r2', created.id)).status).toBe(404);
     expect((await service.remove('r1', created.id)).status).toBe(200);
     expect((await service.get('r1', created.id)).status).toBe(404);
+  });
+
+  it('exposes the tool registry with names and descriptions', () => {
+    const result = service.toolRegistry();
+    expect(result.status).toBe(200);
+    expect(result.body).toEqual(TOOLS);
   });
 });
 

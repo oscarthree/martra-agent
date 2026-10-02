@@ -56,6 +56,7 @@ export const workflowNodeSchema = z.discriminatedUnion('type', [
   z.object({ ...baseNodeFields, type: z.literal('end'), data: z.object({ output: z.string() }) }),
 ]);
 export type WorkflowNode = z.infer<typeof workflowNodeSchema>;
+export type WorkflowNodeType = WorkflowNode['type'];
 
 export const workflowEdgeSchema = z.object({
   id: z.string().min(1),

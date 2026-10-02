@@ -6,7 +6,7 @@ import { compileWorkflow } from './compile';
 import { createCustomAgentRegistry, type CustomAgentRegistry } from './registry';
 import { createCustomAgentsService, type CustomAgentsService } from './service';
 import { ensureCustomAgentsTable, getCustomAgent, listCustomAgents } from './store';
-import { getToolNames } from './tool-registry';
+import { getToolRegistry } from './tool-registry';
 import { WorkflowAgent, type CompiledWorkflowHandle } from './workflow-agent';
 
 // custom-agents 模块组装：与 Mastra 存储读同一组环境变量，但走独立应用表。
@@ -23,7 +23,7 @@ export async function createCustomAgentsModule(): Promise<CustomAgentsModule> {
     authToken: process.env.TURSO_AUTH_TOKEN,
   });
   await ensureCustomAgentsTable(client);
-  const service = createCustomAgentsService({ client, toolNames: getToolNames() });
+  const service = createCustomAgentsService({ client, tools: getToolRegistry() });
   return { client, service, router: createCustomAgentsRouter(service) };
 }
 

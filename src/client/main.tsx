@@ -14,6 +14,7 @@ import { Menu as MenuIcon, Plus } from "lucide-react";
 import "@copilotkit/react-core/v2/styles.css";
 import "./styles.css";
 import { AgentManagerView } from "./agent-manager";
+import { AgentEditorView } from "./agent-editor";
 import { currentResourceId, CustomAgentApiError, getCustomAgent } from "./custom-agent-api";
 import {
   createProject,
@@ -69,7 +70,9 @@ function App() {
     projectId: initialLoad.workspace.activeProjectId,
   });
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [view, setView] = useState<"chat" | "agents">("chat");
+  const [view, setView] = useState<"chat" | "agents" | "editor">("chat");
+  const [editingAgentId, setEditingAgentId] = useState<string | null>(null);
+  const [editorDirty, setEditorDirty] = useState(false);
   const [dialog, setDialog] = useState<DialogState>(null);
   const [chatError, setChatError] = useState<string | null>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
@@ -178,10 +181,14 @@ function App() {
       onSelectProject={handleSelectProject}
       onOpenSession={handleOpenSession}
       onOpenAgentManager={() => {
+        // 编辑器里有未保存修改时，侧栏入口也要确认（规格 §5.4 视图切换拦截）
+        if (view === "editor" && editorDirty && !window.confirm("有未保存的修改，确定离开编辑器吗？")) {
+          return;
+        }
         setView("agents");
         closeDrawer();
       }}
-      agentManagerActive={view === "agents"}
+      agentManagerActive={view !== "chat"}
       onRenameSession={(session) => {
         // 弹窗挂载在抽屉之外：先关抽屉，避免焦点陷阱冲突
         setDrawerOpen(false);
@@ -245,6 +252,17 @@ function App() {
               <AgentManagerView
                 workspace={workspace}
                 onExit={() => setView("chat")}
+                onEditAgent={(definitionId) => {
+                  setEditingAgentId(definitionId);
+                  setView("editor");
+                }}
+              />
+            ) : view === "editor" && editingAgentId !== null ? (
+              <AgentEditorView
+                key={editingAgentId}
+                definitionId={editingAgentId}
+                onExit={() => setView("agents")}
+                onDirtyChange={setEditorDirty}
               />
             ) : (
               <WorkspaceChat
