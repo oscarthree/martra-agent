@@ -50,7 +50,7 @@
 
 ## Web Page Fetch
 
-网页抓取：通用助手的工具能力。用户给出具体网址时，助手调用 `webOpenUrl` 抓取公开网页的原始 HTML 并围绕内容回答；遇到 JS 动态渲染或反爬挑战页（如豆瓣 sec.douban.com 安全校验）时改用 `webOpenUrlRendered`（无头浏览器）。助手没有主动联网搜索能力，只能打开用户给出的 URL；抓取失败（403/超时/登录/验证码/非 HTML 文件）时如实说明，不编造页面内容。
+网页抓取：通用助手的工具能力。用户给出具体网址时，助手调用 `webOpenUrl` 抓取公开网页的原始 HTML 并围绕内容回答；遇到 JS 动态渲染或反爬挑战页（如豆瓣 sec.douban.com 安全校验）时改用 `webOpenUrlRendered`（无头浏览器）。助手没有主动联网搜索能力，只能打开用户给出的 URL；抓取失败（403/超时/登录/验证码/非 HTML 文件）时如实说明，不编造页面内容。这些工具同时经后端工具注册表暴露给 Custom Agent 的工具节点。
 
 ## Image Placeholder
 
@@ -58,8 +58,8 @@
 
 ## Custom Agent
 
-自定义 Agent：用户自行定义行为的助手类型。它的行为由一份 Workflow Definition 完整描述（没有额外的内置指令），通过 Project Agent Type 为 `custom` 的项目绑定到会话。与天气助手、通用助手并列存在。
+自定义 Agent：用户自行定义行为的助手类型。它的行为由一份 Workflow Definition 完整描述（没有额外的内置指令），通过 Project Agent Type 为 `custom` 的项目绑定到会话。与天气助手、通用助手并列存在。定义被项目引用时禁止删除（前端提示引用数）；已绑定的定义被删除后，引用它的会话进入明确的错误态（显示"该自定义 Agent 已被删除"，不可发送消息，不降级到其他助手）。
 
 ## Workflow Definition
 
-工作流定义：一份描述 Custom Agent 行为的图数据——节点（开始、LLM、工具、条件、结束）与连线的集合，经 Dify 风格的可视化画布编辑，保存时校验通过后才可被会话使用。节点间通过 `{{nodeId.output}}` 插值引用上游输出；条件分支按 if / else-if / else 短路求值。
+工作流定义：一份描述 Custom Agent 行为的图数据——节点（开始、LLM、工具、条件、结束）与连线的集合，经 Dify 风格的可视化画布编辑，保存时前后端双重校验通过后才可被会话使用（服务端为最终闸门）。节点间通过 `{{nodeId.output}}` 插值引用上游输出；条件分支按 if / else-if / else 短路求值。定义持久化在服务端 LibSQL，按 Resource Identity 隔离；会话只捕获定义 id（不存图快照），定义更新对已绑定会话即时生效。

@@ -40,6 +40,10 @@ AG-UI Mastra Adapter (@ag-ui/mastra)
     |                           `-- activityPlannerAgent -> 模板化活动规划
     |
     `-- generalAgent（general 类型会话）：纯对话 + 图片理解（base64）+ 网页抓取（webOpenUrl / webOpenUrlRendered 无头浏览器）
+    |
+    `-- customAgent（custom 类型会话，runtimeAgentId = custom-<definitionId>）
+            |-- ensure-registered：定义加载 → 编译 → 动态注册（updatedAt 失效重注册）
+            `-- WorkflowAgent：图编译为 Mastra workflow 执行，最终文本合成流式回复
 ```
 
 意图识别由 `weatherAgent` 根据指令自行选择工具：普通当前天气查询走 `weatherTool`，活动/行程/旅游/攻略/计划类请求走 `weatherWorkflow`（输入为 `{ city: string; days: number }`，days 为 1 到 7，默认 1）。`generalAgent` 不做意图路由，直接对话；用户给出具体网址时调用 `webOpenUrl` 抓取页面 HTML 回答，遇到 JS 动态渲染或反爬拦截时改用 `webOpenUrlRendered`（无头浏览器，ADR 0003）；无主动搜索能力（ADR 0002）。
@@ -49,7 +53,7 @@ AG-UI Mastra Adapter (@ag-ui/mastra)
 - **运行时**：Node.js 24 或更高版本；包管理器 pnpm 10 或更高版本
 - **后端**：Express 5 + TypeScript（ESM，`"type": "module"`），通过 `tsx` 直接运行 TS
 - **AI 框架**：Mastra（`@mastra/core`、`@mastra/express`、`@mastra/memory` 等），模型通过 `@ai-sdk/openai-compatible` 连接 Moonshot
-- **前端**：React 19 + Vite + `@copilotkit/react-core` / `react-ui`（v2 API，`@copilotkit/react-core/v2`），图标使用 `lucide-react`
+- **前端**：React 19 + Vite + `@copilotkit/react-core` / `react-ui`（v2 API，`@copilotkit/react-core/v2`），画布编辑器用 `@xyflow/react`（v12），图标使用 `lucide-react`
 - **存储**：LibSQL（本地文件 `mastra.db`，部署时可切换 Turso）保存应用数据，DuckDB（`mastra.duckdb`）保存可观测性数据，二者经 `MastraCompositeStore` 组合
 - **校验**：zod v4
 - **测试**：Vitest
@@ -79,28 +83,54 @@ AG-UI Mastra Adapter (@ag-ui/mastra)
 - `COPILOTKIT_MODEL`：仅出现在 `.env.example` 中的参考值；代码未读取，实际模型名硬编码在 agent 文件里
 - `OPENAI_API_KEY` / `OPENAI_BASE_URL`：可选的备用 key 名称（当前代码未使用）
 - `TURSO_DATABASE_URL` / `TURSO_AUTH_TOKEN`：可选，设置后 Mastra 存储切换到托管 Turso 数据库（见 `src/mastra/index.ts`）
+- `MASTRA_DUCKDB_PATH`：可选，覆盖可观测性 DuckDB 文件路径（默认 `mastra.duckdb`；多实例并行开发/测试时可设 `:memory:` 或临时路径）
+- `WC_API_TARGET`：可选，Vite 开发服务器 `/api` 代理目标（默认 `http://localhost:3000`），用于把前端指向非默认端口的后端实例
 - `MASTRA_PLATFORM_ACCESS_TOKEN`：可选，设置后可观测性事件会发送到 Mastra Platform
 
 ## 代码结构
 
 ```text
 src/
-├── index.ts                         # Express 服务入口：MastraServer、CopilotKit Runtime v2、/api/copilotkit 路由
+├── index.ts                         # Express 服务入口：MastraServer、CopilotKit Runtime v2、/api/copilotkit 与 /api/custom-agents 路由
+├── shared/
+│   ├── workflow-dsl.ts              # 自定义 Agent 图 DSL 事实标准：zod schema + 保存时语义校验 + 插值渲染 + 条件求值（双端复用）
+│   └── workflow-dsl.test.ts         # 校验规则正反用例 / 插值 / 八操作符
 ├── client/
-│   ├── main.tsx                     # 工作区应用入口：Workspace 状态接线、受控 CopilotChatView、对话框调度
-│   ├── workspace-ui.tsx             # 工作区展示组件：侧栏、Project Context Selector、抽屉、弹窗
+│   ├── main.tsx                     # 工作区应用入口：Workspace 状态接线、受控 CopilotChatView、视图切换（chat/agents/editor）、对话框调度
+│   ├── workspace-ui.tsx             # 工作区展示组件：侧栏、Project Context Selector、抽屉、项目表单弹窗（含自定义助手绑定）
+│   ├── workspace-state.ts           # 工作区/项目/会话的本地状态模型（localStorage 持久化，v2）
+│   ├── workspace-state.test.ts      # 工作区状态测试（含 custom 绑定捕获/错误态推导）
+│   ├── agent-manager.tsx            # 自定义 Agent 管理区：列表/新建/重命名/删除（前端引用保护）
+│   ├── agent-editor.tsx             # Dify 风格三栏画布编辑器（xyflow）：节点面板/画布/属性面板/显式保存/未保存保护
+│   ├── custom-agent-api.ts          # 自定义 Agent REST 客户端（resource-id 头 + 按 id 隔离的列表缓存）
+│   ├── custom-agent-api.test.ts     # 客户端行为测试（mock fetch）
+│   ├── editor/graph-utils.ts        # 编辑器纯函数：序列化/恢复/连线即时约束/节点摘要
+│   ├── editor/graph-utils.test.ts   # 编辑器图逻辑测试
 │   ├── styles.css                   # 前端样式（浅色主题，--wc-* 变量避免与 CopilotKit 主题冲突）
-│   ├── workspace-state.ts           # 工作区/项目/会话的本地状态模型（localStorage 持久化）
-│   └── workspace-state.test.ts      # 工作区状态测试
+│   └── vite-env.d.ts
 └── mastra/
-    ├── index.ts                     # Mastra 实例：注册全部 agent/workflow，配置存储、日志、可观测性
+    ├── index.ts                     # Mastra 实例：注册全部 agent/workflow 与 custom-agents 运行期注册表
     ├── agents/
-    │   ├── index.ts                   # agents 注册表（runtimeAgentId 键：weatherAgent / generalAgent）
+    │   ├── index.ts                   # agents 注册表（runtimeAgentId 键：weatherAgent / generalAgent；custom-<id> 动态注册）
     │   ├── shared.ts                  # 共享 Moonshot provider 与 SessionMemory（recall 软化覆写）
     │   ├── weather-agent.ts           # 天气主 Agent，负责意图路由（工具 vs 工作流）
     │   ├── general-agent.ts           # 通用助手 Agent，纯对话、支持图片理解，无工具
     │   ├── general-agent.test.ts      # generalAgent 定义形态与注册键测试
     │   └── activity-planner-agent.ts # 活动规划 Agent，被工作流调用
+    ├── custom-agents/
+    │   ├── index.ts                   # 模块组装（存储客户端 + service + 路由 + 注册表工厂）
+    │   ├── api.ts                     # /api/custom-agents Express 薄层（含 GET /tools 工具注册表）
+    │   ├── service.ts                 # 端点行为纯函数（status+body），PUT 跑服务端完整 DSL 校验
+    │   ├── service.test.ts
+    │   ├── store.ts                   # custom_agent_definitions 表 CRUD（按 resource_id 隔离）
+    │   ├── store.test.ts
+    │   ├── tool-registry.ts           # 后端工具注册表（PUT 校验与编辑器工具选项共用）
+    │   ├── compile.ts                 # 图 JSON → Mastra workflow 编译（分支取反链/复合分支 step/插值求值）
+    │   ├── compile.test.ts
+    │   ├── workflow-agent.ts          # WorkflowAgent：stream 覆写 + 60s 超时 + 合成 fullStream + 历史落盘
+    │   ├── workflow-agent.test.ts
+    │   ├── registry.ts                # ensure-registered + updatedAt 失效重注册 + 编译缓存
+    │   └── registry.test.ts
     ├── processors/
     │   ├── tool-result-trimmer.ts      # 历史消息大段工具结果压缩（防请求体超限）
     │   └── tool-result-trimmer.test.ts # 压缩/跳过/不可变性测试
@@ -111,6 +141,7 @@ src/
     │   ├── web-open-url-tool.test.ts    # 抓取成功/重定向/超时/非 HTML/挑战页/截断测试
     │   ├── web-open-url-rendered-tool.ts      # 无头浏览器渲染抓取（Playwright，ADR 0003）
     │   └── web-open-url-rendered-tool.test.ts # 渲染抓取测试（mock playwright，不启动浏览器）
+    ├── utils/retry.ts                 # 带指数退避的 withRetry（外部请求与模型调用共用）
     └── workflows/
         ├── weather-workflow.ts      # fetch-weather -> plan-activities 两步工作流
         └── weather-workflow.test.ts # 工作流输入 schema 校验测试
@@ -137,14 +168,16 @@ src/
 ## 工作区前端要点
 
 - 工作区状态是纯函数模型（`workspace-state.ts`），通过 `localStorage` 键 `weather-copilot-workspace-v1` 持久化；加载失败会重置为默认工作区并提示。当前状态版本为 v2：Project 和 Session 带 `agentType`，v1 数据加载时原地迁移（全部补 `weather`）
-- 每个会话在 `useAgent` 中以 `agentId: workspace-session-<session.id>`、`threadId: session.id` 运行，`runtimeAgentId` 由会话的 `agentType` 经 `runtimeAgentIdFor` 推导（`weatherAgent` / `generalAgent`）；首次进入会话时必须以本地快照覆盖 agent 消息（`hydratedSessions` 逻辑），之后用 `reconcileSessionMessages` 决定同步方向
+- 每个会话在 `useAgent` 中以 `agentId: workspace-session-<session.id>`、`threadId: session.id` 运行，`runtimeAgentId` 由会话经 `runtimeAgentIdFor` 推导（weather/general → 注册键；custom → `custom-<customAgentId>`，缺 id 为错误态绝不 fallback）；custom 会话先过 `CustomAgentGate`：按捕获的定义 id 拉取，404/缺失 → "该自定义 Agent 已被删除"错误面板且不挂 `useAgent`（输入物理禁用）；首次进入会话时必须以本地快照覆盖 agent 消息（`hydratedSessions` 逻辑），之后用 `reconcileSessionMessages` 决定同步方向
+- 工作区视图在聊天 / 自定义 Agent 管理区 / 画布编辑器间切换（`view` state，刷新回聊天）；编辑器 dirty 时返回与侧栏入口都弹确认（`onDirtyChange` 上抛 + `beforeunload`）
+- 编辑器保存前端先跑 `src/shared/workflow-dsl` 的共享校验：失败画布顶部错误条列出全部问题、问题节点红色高亮（`node.className` 承载），全部通过才 PUT（服务端再验一次）
 - 附件仅对 `general` 会话开放：受控视图用 `useAttachments` 手动接线队列与拖拽；持久化前 `sanitizeMessagesForStorage` 把图片 part 降级为文本占位符（`reconcileSessionMessages` 比较前会对 agent 侧做同样净化，否则会陷入保存-渲染循环）
 - 浏览器端通过 `localStorage` 持久化 `mastra-resource-id`，请求时放入 `x-mastra-resource-id` 头，后端从该头读取（缺省为 `"default"`），用于关联 Mastra Memory 的服务端记忆（即 CONTEXT.md 中的 Resource Identity）
 
 ## 测试
 
 - 使用 Vitest，运行 `pnpm test`
-- 测试文件与源码同目录，命名为 `*.test.ts`（当前 6 个测试文件、93 个用例）
+- 测试文件与源码同目录，命名为 `*.test.ts`（当前 14 个测试文件、216 个用例）
 - 现有测试覆盖 zod schema 校验（工作流输入）和纯状态逻辑（workspace-state 的序列化/恢复/分组）；网络与模型调用不做集成测试
 - 提交前建议运行 `pnpm test` 和 `pnpm exec tsc --noEmit`
 
@@ -162,3 +195,16 @@ src/
 ## 部署
 
 仓库中没有 CI/CD 配置或部署脚本。当前唯一的部署相关路径是：设置 `TURSO_DATABASE_URL` / `TURSO_AUTH_TOKEN` 使用托管数据库（`src/mastra/index.ts` 注释提到 `mastra env db create --kind turso`），以及设置 `MASTRA_PLATFORM_ACCESS_TOKEN` 上报可观测性数据到 Mastra Platform。前端通过 `pnpm client:build` 产出静态文件到 `dist/`。
+
+<!-- OPENWIKI:START -->
+
+## OpenWiki
+
+This repository has a generated `openwiki/` evidence index. It is optional just-in-time context, not required startup reading.
+
+- Treat source code and tests as authoritative. A brief's unknowns and review items are verification gaps, not automatic requirements.
+- Prefer the narrowest quiet validation that proves the changed behavior. Preserve complete failure output.
+
+The scheduled OpenWiki GitHub Actions workflow refreshes the repository wiki. Do not hand-edit generated OpenWiki pages unless explicitly asked; prefer updating source code/docs and letting OpenWiki regenerate.
+
+<!-- OPENWIKI:END -->

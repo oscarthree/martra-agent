@@ -189,6 +189,12 @@ function createCompileTimeArtifacts(graph: WorkflowGraph, deps: CompileDeps) {
   }
   const nodeMemory = new SessionMemory();
   (nodeMemory as unknown as { __registerMastra(m: Mastra): void }).__registerMastra(deps.mastra);
+  // 与 Agent.getMemory() 的接线一致：除注册 mastra 外还要显式给 storage，
+  // 否则 recall() 落到 storage getter 直接抛 "Memory requires a storage provider"
+  const storage = deps.mastra.getStorage();
+  if (storage) {
+    nodeMemory.setStorage(storage);
+  }
   return { nodeAgents, nodeMemory };
 }
 

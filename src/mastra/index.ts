@@ -24,7 +24,10 @@ export const mastra = new Mastra({
       authToken: process.env.TURSO_AUTH_TOKEN,
     }),
     domains: {
-      observability: await new DuckDBStore().getStore('observability'),
+      observability: await new DuckDBStore({
+        // 可用 MASTRA_DUCKDB_PATH 覆盖（如 ':memory:' 或临时路径），便于多实例开发/测试
+        path: process.env.MASTRA_DUCKDB_PATH ?? 'mastra.duckdb',
+      }).getStore('observability'),
     }
   }),
   logger: new PinoLogger({
