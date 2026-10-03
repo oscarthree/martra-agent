@@ -144,3 +144,9 @@ mastra.db-shm
 mastra.db-wal
 mastra.duckdb
 mastra.duckdb.wal
+
+# Scratch drafts: probes, request dumps, e2e runtime data (AGENTS.md: 不属于主应用构建)
+.scratch/
+
+# OpenWiki-generated pointer stub (source of truth is AGENTS.md)
+CLAUDE.md
